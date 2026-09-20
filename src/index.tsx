@@ -1,13 +1,15 @@
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono';
 import { json } from 'react-router-dom';
 import { HTTPException } from 'hono/http-exception'
 import { html } from 'hono/html'
 
+
+
 const app = new Hono()
 
-app.get('/', (c) => {
+app.get('/', (c: Context) => {
   return c.html(
-    <html>
+    `<html>
       <head>
         <title>Atta Chakki</title>
       </head>
@@ -15,11 +17,12 @@ app.get('/', (c) => {
         <h1>Atta Chakki</h1>
         <p>This Atta Chakki website will be live soon.</p>
       </body>
-    </html>
+    </html>`
   )
 })
 
-app.onError((error, c)=>{
+
+app.onError((error, c: Context )=>{
   console.error(error.message)
 
   if(error instanceof HTTPException){
@@ -133,7 +136,7 @@ const notFoundHtml = (path: string) => html`<!DOCTYPE html>
 
 
 
-app.notFound((c)=>{
+app.notFound((c: Context)=>{
   return c.html(notFoundHtml(c.req.path), 404)
 })
 

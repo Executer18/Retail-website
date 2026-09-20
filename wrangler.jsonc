@@ -2,7 +2,12 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "retail-website",
   "main": "src/index.tsx",
-  "compatibility_date": "2026-09-13"
+  "compatibility_date": "2026-09-13",
+  // Staging environments handle your live mobile sandboxes safely
+  "env": {
+    "staging": {
+      "name": "retail-website-staging"
+    }}
   // "compatibility_flags": [
   //   "nodejs_compat"
   // ],
