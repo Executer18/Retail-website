@@ -1,11 +1,12 @@
 import { Hono, type Context } from 'hono';
 import { json } from 'react-router-dom';
 import { HTTPException } from 'hono/http-exception'
-import { html } from 'hono/html'
-
+import { html } from 'hono/html';
+import { getDB, Env } from './db'; 
 
 
 const app = new Hono()
+
 
 app.get('/', (c: Context) => {
   return c.html(

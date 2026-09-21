@@ -6,17 +6,25 @@
     "deploy": "wrangler deploy --minify",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings",
     "localdev": "tsx watch dev.ts",
-    "wrangler": "node wrangler.cjs"
+    "wrangler": "node wrangler.cjs",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "dotenv": "^17.4.2",
-    "hono": "^4.13.7"
+    "drizzle-orm": "^1.0.0-rc.4",
+    "hono": "^4.13.7",
+    "sqlite3": "^6.0.1",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260918.1",
     "@hono/node-server": "^2.1.1",
-    "tsx": "^4.23.13",
+    "drizzle-kit": "^1.0.0-rc.4",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
-    "wrangler": "^4.110.0"
+    "wrangler": "^4.136.0"
   }
 }
