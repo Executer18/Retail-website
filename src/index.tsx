@@ -3,9 +3,13 @@ import { json } from 'react-router-dom';
 import { HTTPException } from 'hono/http-exception'
 import { html } from 'hono/html';
 import { getDB, Env } from './db'; 
+import { createAuth } from "./auth";
 
+
+import "tailwindcss";
 
 const app = new Hono()
+
 
 
 app.get('/', (c: Context) => {
@@ -23,6 +27,10 @@ app.get('/', (c: Context) => {
 })
 
 
+app.on(["GET", "POST"], "/api/auth/*", (c: Context) => createAuth(c.env).handler(c.req.raw));
+
+
+
 app.onError((error, c: Context )=>{
   console.error(error.message)
 
@@ -37,7 +45,7 @@ return c.json({success: false, error: "internal server error"}, 500)
 
 
 
-const notFoundHtml = (path: string) => html`<!DOCTYPE html>
+const notFoundHtml = (path: string) => html `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
