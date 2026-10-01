@@ -55,7 +55,12 @@ app.on(["GET", "POST"], "/api/auth/*", (c: Context) => createAuth(c.env).handler
 
 
 app.get("/admin", requireAdmin, (c: Context) => {
-  return c.html("<h1>Admin Dashboard</h1><p>You are logged in as admin.</p>")
+  return c.html(`<h1>Admin Dashboard</h1>
+  <p>You are logged in as admin.</p>
+  <form method="POST" action="/logout">
+      <button type="submit">Logout</button>
+    </form>
+  `)
 })
 
 
@@ -97,6 +102,15 @@ app.post("/login", async (c: Context) => {
     return c.redirect("/login?error=1")
   }
 })
+
+
+app.post("/logout", async (c: Context) => {
+  await createAuth(c.env).api.signOut({
+    headers: c.req.raw.headers
+  })
+  return c.redirect("/login")
+})
+
 
 // GET /admin — protected test route
 app.get("/admin", async (c: Context) => {
