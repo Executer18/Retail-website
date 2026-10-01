@@ -3,8 +3,11 @@ import { serve } from "@hono/node-server";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import app from "./src/index"; // your Hono app (default export)
+import app from "./src/index";
+import { serveStatic } from '@hono/node-server/serve-static'
 
+// your Hono app (default export)
+app.use('/*', serveStatic({ root: './public' }))
 // ---------- 1. Load .env ----------
 const envVars: Record<string, string> = {};
 if (existsSync(".env")) {

@@ -6,8 +6,10 @@ import { html } from 'hono/html';
 import { getDB, Env } from './db'; 
 import { createAuth } from "./auth";
 import { json, redirect } from 'react-router-dom';
-import { LoginPage } from "./pages/login";
-
+import { LoginPage } from './pages/LoginPage'
+import { SignupPage } from './pages/SignupPage'
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
+import { ResetPasswordPage } from './pages/ResetPasswordPage'
 
 
 
@@ -32,6 +34,18 @@ app.get('/', (c: Context) => {
     </html>`
   )
 })
+
+
+
+
+// Pages that contain the forms.
+
+
+
+app.get('/login', (c) => c.html(<LoginPage />))
+app.get('/signup', (c) => c.html(<SignupPage />))
+app.get('/forgot-password', (c) => c.html(<ForgotPasswordPage />))
+app.get('/reset-password', (c) => c.html(<ResetPasswordPage />))
 
 
 app.on(["GET", "POST"], "/api/auth/*", (c: Context) => createAuth(c.env).handler(c.req.raw));
