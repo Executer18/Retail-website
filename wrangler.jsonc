@@ -13,11 +13,12 @@
 		{
 			"binding": "DB",
 			"database_name": "attachakki-db",
-			"database_id": "713935c1-b238-4697-8f0e-bcf6d7564f6e",
+			"database_id": "b31e6f11-3531-4663-9cb8-7deb08395cb6",
 			"remote": true,
       "migrations_dir" : "drizzle",
-      "migrations_pattern": "drizzle/*/migration.sql"
+      "migrations_pattern": "drizzle/migration.sql"
 		}
+    
 	],
 	 "compatibility_flags": [
 	   "nodejs_compat"

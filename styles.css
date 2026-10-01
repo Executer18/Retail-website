@@ -1,0 +1,360 @@
+/* ==========================================================================
+   ATTA CHAKKI — DESIGN SYSTEM
+   ==========================================================================
+   One source of truth for color, type, spacing, and motion.
+   Every page pulls from these variables instead of inventing new ones.
+
+   Guiding principle: crimson is the one bold element. Everything else stays
+   quiet and disciplined around it. Gold ties directly to the color of the
+   grain itself — it's not a random "pairs nicely" accent.
+
+   Motion is action-driven, not decorative: things animate when a person
+   does something (adds to cart, submits a form, an order status changes),
+   never on scroll or page-load. See the ANIMATIONS section at the bottom.
+   ========================================================================== */
+
+/* ---------- Font: loaded via <link> tags in Layout's <head>, not @import
+   (an @import blocks rendering; a preconnected <link> doesn't) ---------- */
+
+:root {
+  /* ---- Brand ---- */
+  --color-primary: #e81e57;
+  --color-primary-dark: #b8123f;
+  --color-primary-light: #fde3ec;
+
+  --color-gold: #c98a2b;
+  --color-gold-light: #f7ecd7;
+
+  --color-heritage-orange: #d9661f; /* use once, at most, per page — a mark, not a UI color */
+
+  /* ---- Neutrals (warm-toned, deliberately not generic near-black/near-white) ---- */
+  --color-ink: #211b17;
+  --color-body: #453f3a;
+  --color-muted: #8a8078;
+  --color-border: #e5ded5;
+  --color-bg: #fbf8f4;
+  --color-surface: #ffffff;
+
+  /* ---- Semantic (order status + feedback states) ---- */
+  --color-success: #15803d;
+  --color-success-bg: #dcfce7;
+  --color-warning: #b45309;
+  --color-warning-bg: #fef3c7;
+  --color-info: #1d4ed8;
+  --color-info-bg: #dbeafe;
+  --color-danger: #dc2626;
+  --color-danger-bg: #fee2e2;
+
+  /* ---- Type ---- */
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* ---- Spacing scale ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* ---- Radius: varied by element, not one value for everything ---- */
+  --radius-crisp: 4px;   /* buttons, inputs — precise, receipt-like */
+  --radius-soft: 12px;   /* product cards, images — tactile, packaging-like */
+  --radius-round: 999px; /* badges, pills */
+
+  /* ---- Shadow: one quiet elevation, used sparingly ---- */
+  --shadow-sm: 0 1px 3px rgba(33, 27, 23, 0.08);
+  --shadow-md: 0 8px 24px rgba(33, 27, 23, 0.12);
+
+  /* ---- Motion ---- */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast: 120ms;
+  --duration-base: 220ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ==========================================================================
+   RESET & BASE
+   ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--color-body);
+  background: var(--color-bg);
+}
+
+img { max-width: 100%; display: block; }
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+a:hover { text-decoration: underline; }
+
+/* ---------- Typography scale ---------- */
+
+h1, h2, h3, h4 {
+  color: var(--color-ink);
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0 0 var(--space-3);
+}
+h1 { font-size: 2.25rem; font-weight: 800; letter-spacing: -0.02em; }
+h2 { font-size: 1.75rem; letter-spacing: -0.01em; }
+h3 { font-size: 1.25rem; font-weight: 600; }
+p  { margin: 0 0 var(--space-4); max-width: 65ch; } /* keeps line length readable */
+
+.text-muted { color: var(--color-muted); }
+.text-price { font-weight: 700; color: var(--color-ink); }
+
+/* ==========================================================================
+   LAYOUT PRIMITIVES
+   ========================================================================== */
+
+.container {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 var(--space-5);
+}
+
+.stack > * + * { margin-top: var(--space-4); }   /* vertical rhythm, no manual margins */
+
+.grid-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-5);
+}
+
+/* ==========================================================================
+   BUTTONS
+   ========================================================================== */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-crisp);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease),
+              background-color var(--duration-base) var(--ease),
+              border-color var(--duration-base) var(--ease);
+}
+.btn:active { transform: scale(0.97); } /* the press-feedback — answers the tap itself */
+
+.btn-primary {
+  background: var(--color-primary);
+  color: white;
+}
+.btn-primary:hover { background: var(--color-primary-dark); text-decoration: none; }
+
+.btn-secondary {
+  background: transparent;
+  color: var(--color-ink);
+  border-color: var(--color-border);
+}
+.btn-secondary:hover { border-color: var(--color-ink); text-decoration: none; }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-primary);
+}
+.btn-ghost:hover { background: var(--color-primary-light); text-decoration: none; }
+
+.btn:focus-visible,
+a:focus-visible,
+input:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   CARDS (products)
+   ========================================================================== */
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-soft);
+  overflow: hidden;
+  transition: box-shadow var(--duration-base) var(--ease),
+              border-color var(--duration-base) var(--ease);
+}
+.card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: transparent;
+}
+.card img { aspect-ratio: 4 / 3; object-fit: cover; }
+.card-body { padding: var(--space-4); }
+
+/* ==========================================================================
+   BADGES — mapped directly to real order statuses
+   ========================================================================== */
+
+.badge {
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-round);
+}
+.badge-reserved  { background: var(--color-info-bg);    color: var(--color-info); }
+.badge-confirmed { background: var(--color-gold-light); color: var(--color-gold); }
+.badge-preparing { background: var(--color-warning-bg); color: var(--color-warning); }
+.badge-ready     { background: var(--color-success-bg); color: var(--color-success); }
+.badge-collected { background: var(--color-border);     color: var(--color-muted); }
+.badge-cancelled { background: var(--color-danger-bg);  color: var(--color-danger); }
+
+/* A status badge that just changed settles into place once — not a loop */
+.badge-updated { animation: settle var(--duration-base) var(--ease); }
+
+/* ==========================================================================
+   FORMS
+   ========================================================================== */
+
+label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-ink);
+  margin-bottom: var(--space-2);
+}
+
+input, select, textarea {
+  width: 100%;
+  font-family: inherit;
+  font-size: 1rem;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-crisp);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  transition: border-color var(--duration-base) var(--ease);
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--color-primary);
+  outline: none;
+}
+
+.field { margin-bottom: var(--space-5); }
+.field-error { color: var(--color-danger); font-size: 0.85rem; margin-top: var(--space-1); }
+
+/* ==========================================================================
+   HEADER / FOOTER — structural, deliberately flat (no shadow, no radius)
+   ========================================================================== */
+
+.site-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.site-header .logo {
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: var(--color-ink);
+}
+.site-header nav a {
+  color: var(--color-body);
+  font-weight: 500;
+  margin-left: var(--space-5);
+}
+.site-header nav a:hover { color: var(--color-primary); text-decoration: none; }
+
+.site-footer {
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-6) var(--space-5);
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+/* ==========================================================================
+   CART COUNT — the one small, functional bit of chrome that "bumps"
+   ========================================================================== */
+
+.cart-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-round);
+  background: var(--color-primary);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.cart-count.bump { animation: bump 360ms var(--ease); }
+
+/* ==========================================================================
+   TOAST — confirms an action just completed (order placed, item added)
+   ========================================================================== */
+
+.toast {
+  position: fixed;
+  bottom: var(--space-5);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-ink);
+  color: white;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-crisp);
+  box-shadow: var(--shadow-md);
+  animation: toast-in var(--duration-base) var(--ease);
+}
+
+/* ==========================================================================
+   ANIMATIONS — all action-triggered, none ambient/scroll-based
+   ========================================================================== */
+
+@keyframes bump {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+
+@keyframes settle {
+  0%   { transform: scale(0.9); opacity: 0.4; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes toast-in {
+  0%   { transform: translate(-50%, 16px); opacity: 0; }
+  100% { transform: translate(-50%, 0); opacity: 1; }
+}
+
+/* ==========================================================================
+   RESPONSIVE
+   ========================================================================== */
+
+@media (max-width: 640px) {
+  h1 { font-size: 1.75rem; }
+  h2 { font-size: 1.4rem; }
+  .site-header nav a { margin-left: var(--space-4); }
+}

@@ -22,3 +22,8 @@ build/
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# database testing
+dev.db
+dev.db-shm
+dev.db-wal

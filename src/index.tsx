@@ -1,20 +1,27 @@
+ /** @jsxImportSource hono/jsx */
+
 import { Hono, type Context } from 'hono';
-import { json } from 'react-router-dom';
 import { HTTPException } from 'hono/http-exception'
 import { html } from 'hono/html';
 import { getDB, Env } from './db'; 
 import { createAuth } from "./auth";
+import { json, redirect } from 'react-router-dom';
+import { LoginPage } from "./pages/login";
 
 
-import "tailwindcss";
 
-const app = new Hono()
+
+
+
+
+
+const app = new Hono<{ Bindings: Env }>()
 
 
 
 app.get('/', (c: Context) => {
   return c.html(
-    `<html>
+   ` <html>
       <head>
         <title>Atta Chakki</title>
       </head>
@@ -29,6 +36,70 @@ app.get('/', (c: Context) => {
 
 app.on(["GET", "POST"], "/api/auth/*", (c: Context) => createAuth(c.env).handler(c.req.raw));
 
+
+
+app.get("/signup-test", async (c: Context) => {
+  const result = await createAuth(c.env).api.signUpEmail({
+    body: {
+      email: "admin@test.com",
+      password: "password123",
+      name: "Admin",
+    },
+    headers: c.req.raw.headers,
+  })
+  return c.json({ success: true, user: result?.user })
+})
+
+
+// GET /login — show login form
+app.get("/login", (c: Context) => {
+  const error = c.req.query("error")
+  const errorHtml = error ? '<p style="color:red">Invalid email or password</p>' : ''
+  return c.html(`
+    <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Login</title>
+      </head>
+      <body>
+        <h1>Admin Login</h1>
+        ${errorHtml}
+        <form method="POST" action="/login">
+          <input name="email" type="email" placeholder="Email" required />
+          <input name="password" type="password" placeholder="Password" required />
+          <button type="submit">Login</button>
+        </form>
+      </body>
+    </html>
+  `)
+})
+
+// POST /login — handle form submission
+app.post("/login", async (c: Context) => {
+  const body = await c.req.parseBody()
+  const email = String(body["email"])
+  const password = String(body["password"])
+
+  try {
+    const result = await createAuth(c.env).api.signInEmail({
+      body: { email, password },
+      headers: c.req.raw.headers,
+    })
+    if (!result) return c.redirect("/login?error=1")
+    return c.redirect("/admin")
+  } catch (e) {
+    return c.redirect("/login?error=1")
+  }
+})
+
+// GET /admin — protected test route
+app.get("/admin", async (c: Context) => {
+  const session = await createAuth(c.env).api.getSession({
+    headers: c.req.raw.headers,
+  })
+  if (!session) return c.redirect("/login")
+  return c.html(`<h1>Welcome ${session.user.email}</h1>`)
+})
 
 
 app.onError((error, c: Context )=>{

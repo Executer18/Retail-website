@@ -1,15 +1,19 @@
-// src/db.ts
-import { drizzle } from 'drizzle-orm/d1';
+import { drizzle as drizzleD1 } from "drizzle-orm/d1";
+import { drizzle as drizzleSQLite } from "drizzle-orm/better-sqlite3";
+import Database from "better-sqlite3";
+import * as schema from "../auth-schema";
 
-// 1. Tell TypeScript about your database binding name
 export interface Env {
-  DB: D1Database; // 👈 Replace 'DB' with your actual wrangler.toml binding name
+  DB: D1Database;
   BETTER_AUTH_SECRET: string;
   BETTER_AUTH_URL: string;
   RESEND_API_KEY?: string;
 }
 
-// 2. A clean helper function to initialize Drizzle safely
 export function getDB(env: Env) {
-  return drizzle(env.DB);
+  if (typeof (env.DB as any).prepare === "function" &&
+      !(env.DB as any)._d1) {
+    return drizzleSQLite(new Database("./dev.db"), { schema });
+  }
+  return drizzleD1(env.DB, { schema });
 }
