@@ -55,23 +55,7 @@ app.get("/signup-test", async (c: Context) => {
 app.get("/login", (c: Context) => {
   const error = c.req.query("error")
   const errorHtml = error ? '<p style="color:red">Invalid email or password</p>' : ''
-  return c.html(`
-    <html>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Login</title>
-      </head>
-      <body>
-        <h1>Admin Login</h1>
-        ${errorHtml}
-        <form method="POST" action="/login">
-          <input name="email" type="email" placeholder="Email" required />
-          <input name="password" type="password" placeholder="Password" required />
-          <button type="submit">Login</button>
-        </form>
-      </body>
-    </html>
-  `)
+  return c.html(<LoginPage error={error} />)
 })
 
 // POST /login — handle form submission

@@ -1,6 +1,8 @@
+/** @jsxImportSource hono/jsx */
+
 export function LoginPage({ error }: { error?: string }) {
   return (
-    `<html>
+    <html>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Login — Atta Chakki Admin</title>
@@ -14,6 +16,6 @@ export function LoginPage({ error }: { error?: string }) {
           <button type="submit">Login</button>
         </form>
       </body>
-    </html>`
+    </html>
   )
 }
