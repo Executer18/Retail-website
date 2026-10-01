@@ -7,6 +7,15 @@ export function createAuth(env: Env) {
   
   return betterAuth({
     database: drizzleAdapter(db, { provider: "sqlite" }),
+    // Add this line
+    advanced: {
+      disableCSRFCheck: false,
+    },
+    
+    trustedOrigins: [
+      env.BETTER_AUTH_URL,
+      "https://retail-website.kushalsh9123.workers.dev",
+    ],
     emailAndPassword: {
       enabled: true,
       sendResetPassword: async ({ user, url }) => {

@@ -1,31 +1,36 @@
 {
-	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "retail-website",
-	"main": "src/index.tsx",
-	"compatibility_date": "2026-09-13",
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "retail-website",
+  "main": "src/index.tsx",
+  "compatibility_date": "2026-09-13",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "vars": {
+    "BETTER_AUTH_URL": "https://retail-website.kushalsh9123.workers.dev"
+  },
   "assets": {
     "directory": "./public"
   },
-	// Staging environments handle your live mobile sandboxes safely
-	"env": {
-		"staging": {
-			"name": "retail-website-staging"
-      
-	}},
-	"d1_databases" : [
-		{
-			"binding": "DB",
-			"database_name": "attachakki-db",
-			"database_id": "b31e6f11-3531-4663-9cb8-7deb08395cb6",
-			"remote": true,
-      "migrations_dir" : "drizzle",
+  "rules": [
+    { "type": "ESModule", "globs": ["**/*.js", "**/*.mjs"] }
+  ],
+  "env": {
+    "staging": {
+      "name": "retail-website-staging"
+    }
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "attachakki-db",
+      "database_id": "b31e6f11-3531-4663-9cb8-7deb08395cb6",
+      "remote": true,
+      "migrations_dir": "drizzle",
       "migrations_pattern": "drizzle/migration.sql"
-		}
-    
-	],
-	 "compatibility_flags": [
-	   "nodejs_compat"
-	 ],
+    }
+  ]
+}
 	// "vars": {
 	//   "MY_VAR": "my-variable"
 	// },
@@ -55,4 +60,4 @@
 	//   "enabled": true,
 	//   "head_sampling_rate": 1
 	// }
-  }
+  

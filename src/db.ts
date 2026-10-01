@@ -8,11 +8,11 @@ export interface Env {
   BETTER_AUTH_SECRET: string;
   BETTER_AUTH_URL: string;
   RESEND_API_KEY?: string;
+  IS_LOCAL?: string;
 }
 
 export function getDB(env: Env) {
-  if (typeof (env.DB as any).prepare === "function" &&
-      !(env.DB as any)._d1) {
+  if (env.IS_LOCAL === "true") {
     return drizzleSQLite(new Database("./dev.db"), { schema });
   }
   return drizzleD1(env.DB, { schema });

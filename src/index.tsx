@@ -10,6 +10,8 @@ import { LoginPage } from './pages/LoginPage'
 import { SignupPage } from './pages/SignupPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
+import { requireAdmin } from "./middleware/admin"
+
 
 
 
@@ -49,6 +51,12 @@ app.get('/reset-password', (c) => c.html(<ResetPasswordPage />))
 
 
 app.on(["GET", "POST"], "/api/auth/*", (c: Context) => createAuth(c.env).handler(c.req.raw));
+
+
+
+app.get("/admin", requireAdmin, (c: Context) => {
+  return c.html("<h1>Admin Dashboard</h1><p>You are logged in as admin.</p>")
+})
 
 
 

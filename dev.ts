@@ -82,6 +82,7 @@ const DB: any = {
 // ---------- 4. Env + serve (port 8787 matches your BETTER_AUTH_URL) ----------
 const env = {
   DB,
+  IS_LOCAL: "true",
   BETTER_AUTH_SECRET: envVars.BETTER_AUTH_SECRET ?? "dev-secret-change-me-0123456789abcdef",
   BETTER_AUTH_URL: "http://localhost:8787",
   RESEND_API_KEY: envVars.RESEND_API_KEY,
