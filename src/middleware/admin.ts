@@ -1,4 +1,4 @@
-import { createAuth } from "./auth";
+import { createAuth } from "../auth";
 import type { Context, Next } from "hono";
 
 export async function requireAdmin(c: Context, next: Next) {
