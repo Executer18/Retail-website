@@ -11,6 +11,7 @@ import { SignupPage } from './pages/SignupPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { requireAdmin } from "./middleware/admin"
+import { productsRouter } from "./pages/admin/products";
 
 
 
@@ -48,7 +49,7 @@ app.get('/login', (c) => c.html(<LoginPage />))
 app.get('/signup', (c) => c.html(<SignupPage />))
 app.get('/forgot-password', (c) => c.html(<ForgotPasswordPage />))
 app.get('/reset-password', (c) => c.html(<ResetPasswordPage />))
-
+app.route("/admin/products", productsRouter );
 
 app.on(["GET", "POST"], "/api/auth/*", (c: Context) => createAuth(c.env).handler(c.req.raw));
 
@@ -62,6 +63,21 @@ app.get("/admin", requireAdmin, (c: Context) => {
     </form>
   `)
 })
+
+
+
+app.get("/images/*", async (c) => {
+  const fullPath = c.req.path; // e.g. /images/products/filename.png
+  const key = fullPath.replace("/images/", ""); // e.g. products/filename.png
+  const object = await c.env.IMAGES.get(key);
+  if (!object) return c.notFound();
+  return new Response(object.body, {
+    headers: {
+      "Content-Type": object.httpMetadata?.contentType || "image/jpeg",
+      "Cache-Control": "public, max-age=31536000",
+    },
+  });
+});
 
 
 
