@@ -12,31 +12,150 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { requireAdmin } from "./middleware/admin"
 import { productsRouter } from "./pages/admin/products";
+// Second rework — matches your real db.ts/schema.ts AND the redesigned
+// pages (search bar, category grid with counts, sticky cart bar).
+//
+// Three groups of changes from the version before this one:
+//   1. getDB(c.env), real camelCase columns, real productImages query —
+//      unchanged from before, still correct.
+//   2. Home route now also computes category counts (name + how many
+//      products in it) for the new category grid.
+//   3. Products route now also reads ?q= and does a simple LIKE search
+//      against itemName, combinable with ?category=.
 
-
-
-
-
-
+import { eq, ne, and, or, asc, desc, like, sql } from 'drizzle-orm'
+import { getDB } from './db'
+import { products, productImages } from './db/schema'
+import { HomePage } from './pages/HomePage'
+import { ProductsListPage } from './pages/ProductsListPage'
+import { ProductDetailPage } from './pages/ProductDetailPage'
+import type { ProductCardData } from './components/ProductCard'
 
 
 const app = new Hono<{ Bindings: Env }>()
 
 
+function toCardData(row: typeof products.$inferSelect): ProductCardData {
+  return {
+    id: row.productId,
+    name: row.itemName,
+    category: row.category,
+    pricePerKg: row.pricePerKg,
+    inStockKg: row.inStockKg,
+    imageUrl: row.imageUrl,
+  }
+}
 
-app.get('/', (c: Context) => {
+// ---------- Home page ----------
+app.get('/', async (c) => {
+  const db = getDB(c.env)
+
+  const rows = await db.select().from(products).orderBy(desc(products.inStockKg)).limit(8)
+
+  // Category counts for the home page's "Shop by category" grid.
+  // GROUP BY keeps this to one query instead of one query per category.
+  const categoryRows = await db
+    .select({ category: products.category, count: sql<number>`count(*)` })
+    .from(products)
+    .groupBy(products.category)
+
+  const categories = categoryRows.map((r) => ({ name: r.category, productCount: Number(r.count) }))
+
+  return c.html(<HomePage featuredProducts={rows.map(toCardData)} categories={categories} />)
+})
+
+// ---------- Products listing: ?category= and/or ?q= ----------
+app.get('/products', async (c) => {
+  const db = getDB(c.env)
+  const activeCategory = c.req.query('category') || null
+  const searchQuery = c.req.query('q') || null
+
+  const conditions = []
+  if (activeCategory) conditions.push(eq(products.category, activeCategory))
+  if (searchQuery) conditions.push(like(products.itemName, `%${searchQuery}%`))
+
+  const rows =
+    conditions.length > 0
+      ? await db.select().from(products).where(and(...conditions))
+      : await db.select().from(products)
+
+  const allRows = await db.select({ category: products.category }).from(products)
+  const categories = Array.from(new Set(allRows.map((r) => r.category))).sort()
+
   return c.html(
-   ` <html>
-      <head>
-        <title>Atta Chakki</title>
-      </head>
-      <body>
-        <h1>Atta Chakki</h1>
-        <p>This Atta Chakki website will be live soon.</p>
-      </body>
-    </html>`
+    <ProductsListPage
+      products={rows.map(toCardData)}
+      categories={categories}
+      activeCategory={activeCategory}
+      searchQuery={searchQuery}
+    />
   )
 })
+
+// ---------- Product detail ----------
+app.get('/products/:id', async (c) => {
+  const db = getDB(c.env)
+  const id = parseInt(c.req.param('id'), 10)
+
+  const [row] = await db.select().from(products).where(eq(products.productId, id))
+  if (!row) {
+    return c.notFound()
+  }
+
+  const imageRows = await db
+    .select()
+    .from(productImages)
+    .where(eq(productImages.productId, id))
+    .orderBy(asc(productImages.sortOrder))
+
+  const images =
+    imageRows.length > 0
+      ? imageRows.map((img) => img.imageUrl)
+      : row.imageUrl
+        ? [row.imageUrl]
+        : []
+
+  const sameCategoryRows = await db
+    .select()
+    .from(products)
+    .where(and(eq(products.category, row.category), ne(products.productId, id)))
+    .limit(6)
+
+  const otherRows = await db
+    .select()
+    .from(products)
+    .where(ne(products.category, row.category))
+    .limit(6)
+
+  return c.html(
+    <ProductDetailPage
+      product={{
+        id: row.productId,
+        name: row.itemName,
+        category: row.category,
+        pricePerKg: row.pricePerKg,
+        inStockKg: row.inStockKg,
+        images,
+        description: row.description,
+        ingredients: row.ingredients,
+      }}
+      sameCategoryProducts={sameCategoryRows.map(toCardData)}
+      otherProducts={otherRows.map(toCardData)}
+    />
+  )
+})
+
+
+  
+
+
+
+
+
+
+
+
+
 
 
 

@@ -36,10 +36,28 @@ export const products = sqliteTable(
     imageUrl: text("image_url"),
     createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
     updatedAt: text("updated_at").default(sql`CURRENT_TIMESTAMP`),
+    description: text("description"),
+    ingredients: text("ingredients"),
   },
   (t) => [
     index("idx_products_category").on(t.category),
   ]
+);
+
+
+//productdetail images
+
+export const productImages = sqliteTable(
+  "Product_Images",
+  {
+    imageId: integer("image_id").primaryKey({ autoIncrement: true }),
+    productId: integer("product_id")
+      .notNull()
+      .references(() => products.productId, { onDelete: "cascade" }),
+    imageUrl: text("image_url").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+  },
+  (t) => [index("idx_product_images_product_id").on(t.productId)]
 );
 
 // ==========================================
