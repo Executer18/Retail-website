@@ -30,6 +30,7 @@
 import type { FC } from 'hono/jsx'
 import { Layout } from '../components/Layout'
 import { ProductCard, type ProductCardData } from '../components/ProductCard'
+import { SHOP_GOOGLE_MAPS_URL } from '../lib/shop-info'
 
 export type HomeCategory = {
   name: string
@@ -108,12 +109,19 @@ export const HomePage: FC<{
             <h3>Bring your wheat to grind</h3>
             <p>Drop off your own wheat and collect fresh atta, ground your way.</p>
           </a>
-          <a href="/swap-wheat-for-atta" class="order-type-card">
+          {/* UPDATED (Phase 6 business decision): this is walk-in-only now,
+              not an online flow — price/weight can't be known until the
+              wheat physically arrives. Points at Maps, same as the other
+              two walk-in cards, instead of a /swap-wheat-for-atta page
+              that was never built and now never will be. Import
+              SHOP_GOOGLE_MAPS_URL from '../lib/shop-info' at the top of
+              this file if it isn't already. */}
+          <a href={SHOP_GOOGLE_MAPS_URL} target="_blank" rel="noopener noreferrer" class="order-type-card">
             <span class="order-type-card__icon" aria-hidden="true">
               🔄
             </span>
             <h3>Swap wheat for ready atta</h3>
-            <p>Bring your wheat, skip the wait, and take our ready-made atta instead.</p>
+            <p>Walk in with your wheat and take our ready-made atta instead — handled at the counter.</p>
           </a>
           <a href="/sell-your-grain" class="order-type-card">
             <span class="order-type-card__icon" aria-hidden="true">

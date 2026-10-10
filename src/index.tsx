@@ -3,7 +3,7 @@
 import { Hono, type Context } from 'hono';
 import { HTTPException } from 'hono/http-exception'
 import { html } from 'hono/html';
-import { getDB, Env } from './db'; 
+import { getDB, Env, Variables } from './db'; 
 import { createAuth } from "./auth";
 import { json, redirect } from 'react-router-dom';
 import { LoginPage } from './pages/LoginPage'
@@ -12,25 +12,19 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { requireAdmin } from "./middleware/admin"
 import { productsRouter } from "./pages/admin/products";
-// Second rework — matches your real db.ts/schema.ts AND the redesigned
-// pages (search bar, category grid with counts, sticky cart bar).
-//
-// Three groups of changes from the version before this one:
-//   1. getDB(c.env), real camelCase columns, real productImages query —
-//      unchanged from before, still correct.
-//   2. Home route now also computes category counts (name + how many
-//      products in it) for the new category grid.
-//   3. Products route now also reads ?q= and does a simple LIKE search
-//      against itemName, combinable with ?category=.
-
 import { eq, ne, and, or, asc, desc, like, sql } from 'drizzle-orm'
-import { getDB } from './db'
 import { products, productImages } from './db/schema'
 import { HomePage } from './pages/HomePage'
 import { ProductsListPage } from './pages/ProductsListPage'
 import { ProductDetailPage } from './pages/ProductDetailPage'
 import type { ProductCardData } from './components/ProductCard'
-
+import { sessionMiddleware } from "./middleware/session";
+import { cartRoutes } from './routes/cart'
+import { checkoutRoutes } from './routes/checkout'
+import { orderRoutes } from './routes/orders'
+import { grindQuoteRoutes } from './routes/grind-quote'
+import { sellQuoteRoutes } from './routes/sell-quote'
+import { OrderLandingPage } from './pages/OrderLandingPage'
 
 const app = new Hono<{ Bindings: Env }>()
 
@@ -45,6 +39,17 @@ function toCardData(row: typeof products.$inferSelect): ProductCardData {
     imageUrl: row.imageUrl,
   }
 }
+
+
+app.use("*", sessionMiddleware);
+
+app.get('/order', (c) => c.html(<OrderLandingPage />))
+
+app.route('/', cartRoutes)
+app.route('/', checkoutRoutes)
+app.route('/', orderRoutes)
+app.route('/', grindQuoteRoutes)
+app.route('/', sellQuoteRoutes)
 
 // ---------- Home page ----------
 app.get('/', async (c) => {

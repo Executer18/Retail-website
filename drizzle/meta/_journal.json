@@ -15,6 +15,27 @@
       "when": 1791109093087,
       "tag": "0001_green_slyde",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791260339032,
+      "tag": "0002_odd_nomad",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1791261661413,
+      "tag": "0003_organic_may_parker",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1791271125398,
+      "tag": "0004_classy_blade",
+      "breakpoints": true
     }
   ]
 }

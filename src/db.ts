@@ -12,6 +12,11 @@ const finalSchema = {
 
 };
 
+// types.ts from phase 6 files
+export type Variables = {
+  sessionId: string
+}
+
 export interface Env {
   DB: D1Database;
   IMAGES: R2Bucket;

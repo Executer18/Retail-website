@@ -893,3 +893,275 @@ input:focus, select:focus, textarea:focus {
 .suggestions__scroller .product-card {
   flex: 0 0 170px;
 }
+
+
+
+
+
+/* ==========================================================================
+   PHASE 6 ADDITIONS — append this to the end of your existing
+   public/styles.css (after the Phase 5 additions). Nothing here redefines
+   earlier variables/classes.
+   ========================================================================== */
+
+/* ---------- Form fields (shared: checkout, quote calculators) ---------- */
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+.form-field input,
+.form-field select,
+.form-field textarea {
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 400;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-crisp);
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+.form-field--checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-3);
+}
+.form-field--checkbox input {
+  width: auto;
+  flex-shrink: 0;
+}
+
+/* ---------- Cart page ---------- */
+
+.cart-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+.cart-line {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  gap: var(--space-4);
+  align-items: start;
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+.cart-line__image {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-soft);
+  overflow: hidden;
+  background: var(--color-border);
+  flex-shrink: 0;
+}
+.cart-line__image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cart-line__name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: var(--space-1);
+}
+.cart-line__qty-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.cart-line__qty-input {
+  width: 64px;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-crisp);
+  font-size: 0.85rem;
+}
+.cart-line__right {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+.cart-line__remove {
+  background: none;
+  border: none;
+  color: var(--color-danger);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+.cart-line__remove:hover {
+  text-decoration: underline;
+}
+
+.cart-summary {
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-soft);
+}
+.cart-summary__row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+/* ---------- Checkout page ---------- */
+
+.checkout-summary {
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-soft);
+  margin-bottom: var(--space-6);
+}
+.checkout-summary__row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.88rem;
+  padding: var(--space-2) 0;
+}
+.checkout-summary__total {
+  border-top: 1px solid var(--color-border);
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.checkout-form {
+  max-width: 480px;
+}
+
+/* ---- Bring-wheat-buy-atta toggle ---- */
+
+.wheat-swap-toggle {
+  padding: var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-soft);
+  margin-bottom: var(--space-5);
+}
+.wheat-swap-note {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height var(--duration-base) var(--ease), opacity var(--duration-base) var(--ease);
+}
+.wheat-swap-checkbox:checked ~ .wheat-swap-note,
+.wheat-swap-toggle:has(.wheat-swap-checkbox:checked) .wheat-swap-note {
+  max-height: 200px;
+  opacity: 1;
+  margin-top: var(--space-3);
+}
+
+/* ---------- Order confirmation ---------- */
+
+.order-confirmation {
+  text-align: center;
+  max-width: 420px;
+  margin: var(--space-7) auto;
+}
+.order-confirmation__check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-round);
+  background: var(--color-success);
+  color: white;
+  font-size: 1.6rem;
+  margin-bottom: var(--space-4);
+}
+.order-confirmation__details {
+  text-align: left;
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-soft);
+  margin-top: var(--space-5);
+}
+.order-confirmation__row {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-2) 0;
+  font-size: 0.9rem;
+}
+.order-confirmation__value {
+  font-weight: 700;
+}
+
+/* ---------- Order history ---------- */
+
+.order-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.order-history-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-soft);
+  text-decoration: none;
+  color: inherit;
+}
+.order-history-row:hover {
+  border-color: var(--color-primary);
+  text-decoration: none;
+}
+.order-history-row__id {
+  font-weight: 700;
+  margin-bottom: var(--space-1);
+}
+
+/* ---------- Grind / sell quote calculators ---------- */
+
+.quote-form {
+  max-width: 420px;
+}
+.quote-result {
+  max-width: 420px;
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-soft);
+}
+.quote-result__heading {
+  font-weight: 700;
+  margin-bottom: var(--space-4);
+}
+.quote-result__row {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-2) 0;
+  font-size: 0.88rem;
+}
+.quote-result__row--highlight {
+  border-top: 1px solid var(--color-border);
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
+  font-weight: 700;
+  font-size: 1rem;
+}
