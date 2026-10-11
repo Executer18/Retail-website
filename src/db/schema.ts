@@ -40,6 +40,8 @@ export const products = sqliteTable(
     updatedAt: text("updated_at").default(sql`CURRENT_TIMESTAMP`),
     description: text("description"),
     ingredients: text("ingredients"),
+    discount: integer("product_discount"),
+    size: real("size_variants"),
   },
   (t) => [
     index("idx_products_category").on(t.category),

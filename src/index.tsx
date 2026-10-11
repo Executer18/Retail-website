@@ -26,6 +26,10 @@ import { grindQuoteRoutes } from './routes/grind-quote'
 import { sellQuoteRoutes } from './routes/sell-quote'
 import { OrderLandingPage } from './pages/OrderLandingPage'
 
+import { Layout } from './components/Layout'
+import { groupBySizeVariants, maxVariantStock } from './lib/product-variants'
+
+
 const app = new Hono<{ Bindings: Env }>()
 
 
@@ -37,11 +41,17 @@ function toCardData(row: typeof products.$inferSelect): ProductCardData {
     pricePerKg: row.pricePerKg,
     inStockKg: row.inStockKg,
     imageUrl: row.imageUrl,
+
+    discountPct: row.discount,       // integer("product_discount")
+    variants: row.size,               // real("size_variants")
+    
   }
 }
 
 
 app.use("*", sessionMiddleware);
+
+
 
 app.get('/order', (c) => c.html(<OrderLandingPage />))
 
@@ -51,14 +61,19 @@ app.route('/', orderRoutes)
 app.route('/', grindQuoteRoutes)
 app.route('/', sellQuoteRoutes)
 
+
+
 // ---------- Home page ----------
+
 app.get('/', async (c) => {
   const db = getDB(c.env)
 
-  const rows = await db.select().from(products).orderBy(desc(products.inStockKg)).limit(8)
+  const rows = await db.select().from(products).orderBy(desc(products.inStockKg)).limit(40)
 
-  // Category counts for the home page's "Shop by category" grid.
-  // GROUP BY keeps this to one query instead of one query per category.
+  const featured = groupBySizeVariants(rows)
+    .sort((a, b) => maxVariantStock(b) - maxVariantStock(a))
+    .slice(0, 10)
+
   const categoryRows = await db
     .select({ category: products.category, count: sql<number>`count(*)` })
     .from(products)
@@ -66,10 +81,11 @@ app.get('/', async (c) => {
 
   const categories = categoryRows.map((r) => ({ name: r.category, productCount: Number(r.count) }))
 
-  return c.html(<HomePage featuredProducts={rows.map(toCardData)} categories={categories} />)
+  return c.html(<HomePage featuredProducts={featured} categories={categories} />)
 })
 
-// ---------- Products listing: ?category= and/or ?q= ----------
+
+
 app.get('/products', async (c) => {
   const db = getDB(c.env)
   const activeCategory = c.req.query('category') || null
@@ -89,7 +105,7 @@ app.get('/products', async (c) => {
 
   return c.html(
     <ProductsListPage
-      products={rows.map(toCardData)}
+      products={groupBySizeVariants(rows)}
       categories={categories}
       activeCategory={activeCategory}
       searchQuery={searchQuery}

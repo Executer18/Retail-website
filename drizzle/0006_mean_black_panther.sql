@@ -1,0 +1,1 @@
+ALTER TABLE `Products` ADD `size_variants` real;

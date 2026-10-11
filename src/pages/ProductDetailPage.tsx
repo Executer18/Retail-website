@@ -207,7 +207,7 @@ export const ProductDetailPage: FC<{
 
           <button
             type="button"
-            class="btn btn-primary sticky-cart-bar__btn"
+            class="btn "
             hx-post={`/api/cart/add/${product.id}`}
             hx-vals="js:{quantityKg: document.querySelector('[data-qty-value]').textContent}"
             hx-target="#cart-count"

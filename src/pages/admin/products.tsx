@@ -124,7 +124,7 @@ function AdminLayout({ children, title }: { children: any; title: string }) {
 }
 
 // ── Shared category options ─────────────────────────────
-const CATEGORIES = ["Atta", "Flour", "Grain", "Rice", "Other"];
+const CATEGORIES = ["Atta", "Flour", "Grain", "Rice", "massala", "other"];
 
 // ── GET /admin/products ────────────────────────────────
 productsRouter.get("/", requireAdmin, async (c) => {

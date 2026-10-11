@@ -1,5 +1,14 @@
 import React, { lazy } from 'react';
 import type { FC } from 'hono/jsx'
+import { rupee, formatSize } from '../lib/format'
+
+export type ProductVariant = {
+  id: number
+  sizeKg: number
+  pricePerKg: number
+  inStockKg: number
+  discountPct: number
+}
 
 export type ProductCardData = {
   id: number
@@ -7,52 +16,72 @@ export type ProductCardData = {
   category: string
   pricePerKg: number
   inStockKg: number
+  discountPct: number
   imageUrl: string | null
+  /** Every pack size for this item (same itemName — see product-variants.ts). Always at least length 1, this card's own size included. */
+  variants: ProductVariant[]
 }
-
-// Tune this one number to change what counts as "almost out" sitewide.
-const LOW_STOCK_THRESHOLD_KG = 5
 
 export const ProductCard: FC<{ product: ProductCardData }> = ({ product }) => {
   const isOutOfStock = product.inStockKg <= 0
-  const isLowStock = !isOutOfStock && product.inStockKg <= LOW_STOCK_THRESHOLD_KG
+  const hasMultipleSizes = product.variants.length > 1
+  const goTo = `location.href='/products/${product.id}'`
 
   return (
-    <a
-      href={`/products/${product.id}`}
-      class={`card product-card${isOutOfStock ? ' product-card--out-of-stock' : ''}`}
-      style="display: block; text-decoration: none; color: inherit; position: relative;"
-    >
-      <div class="product-card__image-wrap">
+    <div class={`pcard${isOutOfStock ? ' out-of-stock' : ''}`} data-id={product.id}>
+      <div class="img" style="cursor:pointer" onclick={goTo}>
         {product.imageUrl ? (
           <img src={product.imageUrl} alt={product.name} loading="lazy" />
         ) : (
-          <div class="product-card__image-placeholder" aria-hidden="true">
-            No image
-          </div>
+          <span aria-hidden="true">🌾</span>
         )}
-
-        {isOutOfStock && <span class="badge badge-collected product-card__stock-tag">Out of stock</span>}
-        {isLowStock && (
-          <span class="badge product-card__stock-tag product-card__stock-tag--low">
-            Only {product.inStockKg}kg left
-          </span>
-        )}
+        {product.discountPct > 0 && <span class="off">{product.discountPct}% OFF</span>}
       </div>
 
-      <div class="card-body">
-        <p class="text-muted" style="font-size: 0.8rem; margin-bottom: var(--space-1);">
-          {product.category}
-        </p>
-        <h3 style="font-size: 0.95rem; margin-bottom: var(--space-2);">{product.name}</h3>
-        <p class="text-price" style="margin: 0;">
-          &#8377;{product.pricePerKg.toFixed(2)}
-          <span class="text-muted" style="font-weight: 400; font-size: 0.85rem;">
-            {' '}
-            /kg
-          </span>
-        </p>
+      <div class="body">
+        <div class="nm" style="cursor:pointer" onclick={goTo}>
+          {product.name}
+        </div>
+        <div class="wt">
+          {formatSize(product.variants[0].sizeKg)} · Stone ground
+          {hasMultipleSizes && <span class="size-badge">+{product.variants.length - 1}</span>}
+        </div>
+        <div class="pr">
+          {rupee(product.pricePerKg)}
+          {product.discountPct > 0 && <s>{rupee(product.pricePerKg / (1 - product.discountPct / 100))}</s>}
+        </div>
+
+        <div class="addrow">
+          {isOutOfStock ? (
+            <button class="addbtn" disabled style="opacity:.5">
+              Out of stock
+            </button>
+          ) : hasMultipleSizes ? (
+            // Both fire on click: the GET fills #variant-modal-body, the
+            // onclick opens the sheet right away rather than waiting on
+            // the response — a one-beat-early open reads better than a
+            // delay, and the body's loading state (see products.ts)
+            // covers the gap.
+            <button
+              type="button"
+              class="addbtn"
+              hx-get={`/api/products/${product.id}/variants`}
+              hx-target="#variant-modal-body"
+              hx-swap="innerHTML"
+              onclick="openSheet('variantModal')"
+            >
+              SELECT SIZE
+            </button>
+          ) : (
+            <form hx-post={`/api/cart/adjust/${product.id}`} hx-target="#cart-count" hx-swap="innerHTML">
+              <input type="hidden" name="delta" value="1" />
+              <button type="submit" class="addbtn">
+                ADD
+              </button>
+            </form>
+          )}
+        </div>
       </div>
-    </a>
+    </div>
   )
 }
