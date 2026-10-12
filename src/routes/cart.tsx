@@ -159,7 +159,10 @@ cartRoutes.post('/api/cart/add/:productId', async (c) => {
     ? `<span id="cart-add-feedback" hx-swap-oob="true" class="cart-add-feedback cart-add-feedback--visible">Only ${product.inStockKg}kg available — added the maximum.</span>`
     : `<span id="cart-add-feedback" hx-swap-oob="true" class="cart-add-feedback"></span>`
 
-  c.header('HX-Trigger', cartTrigger(wasClamped ? `Only ${product.inStockKg}kg available — added the maximum.` : undefined))
+  c.header('HX-Trigger', cartTrigger(wasClamped ? `Only ${product.inStockKg}kg available added the maximum.` : undefined))
+
+
+  
   return c.html(`${itemCount}${warningHtml}`)
 })
 
@@ -324,7 +327,7 @@ cartRoutes.post('/api/cart/update/:cartItemId', async (c) => {
         )
       : items
 
-    c.header('HX-Trigger', cartTrigger(wasClamped ? `Only ${product.inStockKg}kg available — added the maximum.` : undefined))
+    c.header('HX-Trigger', cartTrigger(clampedTo !== null ? `Only ${clampedTo}kg available adjusted.` : undefined))
   return c.html(
     <>
       <CartContents items={withWarning} total={total} totalMrp={totalMrp} totalSavings={totalSavings} />
@@ -348,7 +351,7 @@ cartRoutes.post('/api/cart/remove/:cartItemId', async (c) => {
 
   const cardOob = row ? await renderCardOob(db, row.productId, 0) : null
   const { items, total, totalMrp, totalSavings } = await loadCartWithProducts(db, sessionId)
-  c.header('HX-Trigger', cartTrigger(wasClamped ? `Only ${product.inStockKg}kg available — added the maximum.` : undefined))
+  c.header('HX-Trigger', cartTrigger())
   return c.html(
     <>
       <CartContents items={items} total={total} totalMrp={totalMrp} totalSavings={totalSavings} />
