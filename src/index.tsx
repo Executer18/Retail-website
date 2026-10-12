@@ -28,6 +28,7 @@ import { OrderLandingPage } from './pages/OrderLandingPage'
 
 import { Layout } from './components/Layout'
 import { groupBySizeVariants, maxVariantStock } from './lib/product-variants'
+import { getCartQuantities } from './routes/cart';
 
 
 const app = new Hono<{ Bindings: Env }>()
@@ -67,13 +68,17 @@ app.route('/', sellQuoteRoutes)
 
 app.get('/', async (c) => {
   const db = getDB(c.env)
-
+  const sessionId = c.get('sessionId')
+  
   const rows = await db.select().from(products).orderBy(desc(products.inStockKg)).limit(40)
 
   const featured = groupBySizeVariants(rows)
     .sort((a, b) => maxVariantStock(b) - maxVariantStock(a))
     .slice(0, 10)
 
+  const cartQuantities = await getCartQuantities(db, sessionId)
+
+  
   const categoryRows = await db
     .select({ category: products.category, count: sql<number>`count(*)` })
     .from(products)
@@ -81,7 +86,7 @@ app.get('/', async (c) => {
 
   const categories = categoryRows.map((r) => ({ name: r.category, productCount: Number(r.count) }))
 
-  return c.html(<HomePage featuredProducts={featured} categories={categories} />)
+  return c.html(<HomePage featuredProducts={featured} categories={categories} cartQuantities={cartQuantities} />)
 })
 
 

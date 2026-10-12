@@ -136,7 +136,8 @@ const HERO_SLIDES = [
 export const HomePage: FC<{
   featuredProducts: ProductCardData[]
   categories: HomeCategory[]
-}> = ({ featuredProducts, categories }) => {
+  cartQuantities: Record<number, number>   
+}> = ({ featuredProducts, categories, cartQuantities }) => {
   return (
     <Layout title="Home" description="Fresh atta, besan, and sooji, ground daily. Order online for pickup." active="home" header="search">
       {/* ---------- Category strip ---------- */}
@@ -244,7 +245,7 @@ export const HomePage: FC<{
         {featuredProducts.length > 0 ? (
           <div class="prodgrid">
             {featuredProducts.map((product) => (
-              <ProductCard product={product} />
+              <ProductCard product={product} currentQtyKg={cartQuantities[product.id] ?? 0} />
             ))}
           </div>
         ) : (

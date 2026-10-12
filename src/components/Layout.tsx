@@ -132,6 +132,27 @@ const LAYOUT_SCRIPT = `
     }
   });
 
+  // maximum product added message
+  document.body.addEventListener('cart-warning', function(e){
+  toast((e.detail && e.detail.message) || 'Only a limited quantity is available.');
+});
+
+// offline no internet connection
+function setOfflineBanner(isOffline){
+  var el = document.getElementById('offline-banner');
+  if (el) el.classList.toggle('show', isOffline);
+}
+window.addEventListener('offline', function(){ setOfflineBanner(true); });
+window.addEventListener('online', function(){ setOfflineBanner(false); toast('Back online ✅'); });
+if (!navigator.onLine) setOfflineBanner(true);
+
+// Fires when an htmx request never reaches the server at all — the
+// exact "button click does nothing" case.
+document.body.addEventListener('htmx:sendError', function(){
+  toast('No internet connection — please try again');
+});
+
+
   // Shared toast (used by the grinding/sell-to-store calculators on the
   // home page, and anywhere else that wants a quick confirmation).
   var toastTimer;
@@ -345,6 +366,7 @@ export const Layout: FC<LayoutProps> = ({
         {/* ---------- Minimal shared JS (modal open/close + cart badge show/hide) ---------- */}
         <script>{raw(LAYOUT_SCRIPT)}</script>
       </body>
+      <div id="offline-banner" class="offline-banner">No internet connection</div>
     </html>
   )
 }

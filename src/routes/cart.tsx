@@ -32,6 +32,15 @@ import { groupBySizeVariants } from '../lib/product-variants'
 
 export const cartRoutes = new Hono<{ Bindings: Env; Variables: Variables }>()
 
+
+
+function cartTrigger(warningMessage?: string) {
+  return JSON.stringify({
+    'cart-updated': true,
+    ...(warningMessage ? { 'cart-warning': { message: warningMessage } } : {}),
+  })
+}
+
 async function loadCartWithProducts(db: ReturnType<typeof getDB>, sessionId: string) {
   const rows = await db
     .select({
@@ -77,6 +86,17 @@ async function loadCartWithProducts(db: ReturnType<typeof getDB>, sessionId: str
   const totalSavings = totalMrp - total
 
   return { items, total, totalMrp, totalSavings }
+}
+
+export async function getCartQuantities(db: ReturnType<typeof getDB>, sessionId: string): Promise<Record<number, number>> {
+  const rows = await db
+    .select({ productId: cartItems.productId, quantityKg: cartItems.quantityKg })
+    .from(cartItems)
+    .where(eq(cartItems.sessionId, sessionId))
+
+  const map: Record<number, number> = {}
+  for (const row of rows) map[row.productId] = row.quantityKg
+  return map
 }
 
 
@@ -139,7 +159,7 @@ cartRoutes.post('/api/cart/add/:productId', async (c) => {
     ? `<span id="cart-add-feedback" hx-swap-oob="true" class="cart-add-feedback cart-add-feedback--visible">Only ${product.inStockKg}kg available — added the maximum.</span>`
     : `<span id="cart-add-feedback" hx-swap-oob="true" class="cart-add-feedback"></span>`
 
-  c.header('HX-Trigger', 'cart-updated')
+  c.header('HX-Trigger', cartTrigger(wasClamped ? `Only ${product.inStockKg}kg available — added the maximum.` : undefined))
   return c.html(`${itemCount}${warningHtml}`)
 })
 
@@ -212,7 +232,7 @@ cartRoutes.post('/api/cart/adjust/:productId', async (c) => {
   const { items } = await loadCartWithProducts(db, sessionId)
   const itemCount = items.length
 
-  c.header('HX-Trigger', 'cart-updated')
+  c.header('HX-Trigger', cartTrigger(wasClamped ? `Only ${product.inStockKg}kg available added the maximum.` : undefined))
   return c.html(
     <>
       {itemCount}
@@ -304,7 +324,7 @@ cartRoutes.post('/api/cart/update/:cartItemId', async (c) => {
         )
       : items
 
-    c.header('HX-Trigger', 'cart-updated')
+    c.header('HX-Trigger', cartTrigger(wasClamped ? `Only ${product.inStockKg}kg available — added the maximum.` : undefined))
   return c.html(
     <>
       <CartContents items={withWarning} total={total} totalMrp={totalMrp} totalSavings={totalSavings} />
@@ -328,7 +348,7 @@ cartRoutes.post('/api/cart/remove/:cartItemId', async (c) => {
 
   const cardOob = row ? await renderCardOob(db, row.productId, 0) : null
   const { items, total, totalMrp, totalSavings } = await loadCartWithProducts(db, sessionId)
-  c.header('HX-Trigger', 'cart-updated')
+  c.header('HX-Trigger', cartTrigger(wasClamped ? `Only ${product.inStockKg}kg available — added the maximum.` : undefined))
   return c.html(
     <>
       <CartContents items={items} total={total} totalMrp={totalMrp} totalSavings={totalSavings} />
