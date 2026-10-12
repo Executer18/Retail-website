@@ -29,10 +29,11 @@ import { OrderLandingPage } from './pages/OrderLandingPage'
 import { Layout } from './components/Layout'
 import { groupBySizeVariants, maxVariantStock } from './lib/product-variants'
 import { getCartQuantities } from './routes/cart';
-
+import { contextStorage } from 'hono/context-storage'
 
 const app = new Hono<{ Bindings: Env }>()
 
+app.use('*', contextStorage()) 
 
 function toCardData(row: typeof products.$inferSelect): ProductCardData {
   return {

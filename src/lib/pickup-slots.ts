@@ -12,9 +12,9 @@
 
 // Edit these two to match your actual shop hours.
 export const SHOP_OPEN_HOUR = 9 // 9:00 AM
-export const SHOP_CLOSE_HOUR = 20 // 8:00 PM
-export const SLOT_INTERVAL_MINUTES = 60 // one bookable slot per hour
-export const MINIMUM_LEAD_HOURS = 5
+export const SHOP_CLOSE_HOUR = 22 // 8:00 PM
+export const SLOT_INTERVAL_MINUTES = 30 // two bookable slot per hour
+export const MINIMUM_LEAD_HOURS = 2
 
 const IST_OFFSET_MINUTES = 5.5 * 60
 

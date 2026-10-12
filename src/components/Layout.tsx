@@ -15,6 +15,7 @@
 
 import type { FC, PropsWithChildren } from 'hono/jsx'
 import { raw } from 'hono/html'
+import { getContext } from 'hono/context-storage'
 
 type NavKey = 'home' | 'product' | 'search' | 'account' | 'contact'
 
@@ -194,6 +195,12 @@ export const Layout: FC<LayoutProps> = ({
 }) => {
   const hasInitialCount = typeof initialCartCount === 'number' && initialCartCount > 0
 
+// 1. Fetch the Hono context automatically out of thin air
+  const c = getContext()
+  
+  // 2. Check if the user is on the checkout page (fallback safely if c is undefined)
+  const isCheckout = c?.req?.path === '/checkout'
+  
   return (
     <html lang="en">
       <head>
@@ -209,6 +216,11 @@ export const Layout: FC<LayoutProps> = ({
         />
         <link rel="stylesheet" href="/utility.css" />
         <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+        <style>{`
+          .hide-cart {
+            display: none !important;
+          }
+        `}</style>
       </head>
       <body class={active ? `page-${active}` : undefined}>
         {/* ---------- Top bar ---------- */}
@@ -269,6 +281,7 @@ export const Layout: FC<LayoutProps> = ({
             which returns the button with/without the .show class. */}
         <div
           id="floatcart-slot"
+          class={isCheckout ? 'hide-cart' : undefined}
           hx-get="/api/cart/summary"
           hx-trigger="load, cart-updated from:body"
           hx-swap="innerHTML"
