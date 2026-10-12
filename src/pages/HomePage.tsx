@@ -133,6 +133,102 @@ const HERO_SLIDES = [
   { src: '/hero/3.jpg', kicker: 'Full transparency', title: 'Watch Your Grain Get Ground', sub: 'Live counter view · zero mixing guarantee' },
 ]
 
+
+// Home-page-only client logic: the grinding calculator (ported straight
+// from the mockup, same GRIND_RATES) and the new sell-to-store
+// calculator. Neither touches D1 — SELL_RATES below is an illustrative
+// starting point, edit freely.
+const HOME_SCRIPT = `
+  function rupee(n){ return '₹' + Math.round(n).toLocaleString('en-IN'); }
+
+  var GRIND_RATES = { wheat:4, multigrain:5, millet:6, besan:5, rice:4, spice:8 }; // ₹/kg
+  var GRIND_LABELS = { wheat:'Wheat', multigrain:'Multigrain mix', millet:'Millets', besan:'Chana dal → besan', rice:'Rice', spice:'Spices' };
+
+  function toggleChip(el){ el.classList.toggle('on'); }
+
+  function calcQuote(e){
+    e.preventDefault();
+    var grain = document.getElementById('c-grain').value;
+    var kg = Math.max(1, parseFloat(document.getElementById('c-kg').value) || 0);
+    var fine = document.getElementById('c-fine').classList.contains('on');
+    var rate = GRIND_RATES[grain] + (fine ? 1 : 0);
+    var total = rate * kg;
+    var out = document.getElementById('calcOut');
+    out.innerHTML =
+      '<div class="row"><span>Grain</span><b>' + GRIND_LABELS[grain] + '</b></div>' +
+      '<div class="row"><span>Quantity</span><b>' + kg + ' kg</b></div>' +
+      '<div class="row"><span>Grinding @ ₹' + rate + '/kg</span><b>' + rupee(total) + '</b></div>' +
+      '<div class="row total"><span>Total</span><b>' + rupee(total) + '</b></div>' +
+      '<p style="font-size:11px;color:var(--color-muted);margin-top:8px">💡 Drop your grain at the store and collect fresh flour — final quote confirmed at the counter.</p>';
+    out.classList.add('show');
+    toast('Quote ready ✨');
+  }
+
+  // --- Sell to store — illustrative rates, tune freely ---
+  var SELL_RATES = { wheat:22, mustard:52, soybean:45, chana:68, bajra:24, jowar:26, maize:20 }; // ₹/kg, Grade A
+  var SELL_LABELS = { wheat:'Wheat', mustard:'Mustard', soybean:'Soybean', chana:'Chana (Gram)', bajra:'Bajra', jowar:'Jowar', maize:'Maize' };
+  var GRADE_MULTIPLIER = { a:1, b:0.92, c:0.8 };
+  var GRADE_LABEL = { a:'A · Clean & dry', b:'B · Average', c:'C · Needs cleaning' };
+
+  function selectGrade(el){
+    var row = document.getElementById('s-grade-row');
+    row.querySelectorAll('.chip').forEach(function(c){ c.classList.remove('on'); });
+    el.classList.add('on');
+  }
+
+  function sellQuote(e){
+    e.preventDefault();
+    var grain = document.getElementById('s-grain').value;
+    var kg = Math.max(1, parseFloat(document.getElementById('s-kg').value) || 0);
+    var gradeBtn = document.querySelector('#s-grade-row .chip.on');
+    var grade = gradeBtn ? gradeBtn.dataset.grade : 'a';
+    var baseRate = SELL_RATES[grain] || 0;
+    var perKg = baseRate * (GRADE_MULTIPLIER[grade] || 1);
+    var total = perKg * kg;
+    var out = document.getElementById('sellOut');
+    out.innerHTML =
+      '<div class="row"><span>Grain</span><b>' + SELL_LABELS[grain] + '</b></div>' +
+      '<div class="row"><span>Quantity</span><b>' + kg + ' kg</b></div>' +
+      '<div class="row"><span>Quality grade</span><b>' + GRADE_LABEL[grade] + '</b></div>' +
+      '<div class="row"><span>Rate @ ₹' + perKg.toFixed(2) + '/kg</span><b>' + rupee(total) + '</b></div>' +
+      '<div class="row total"><span>Estimated payout</span><b>' + rupee(total) + '</b></div>' +
+      '<p style="font-size:11px;color:var(--color-muted);margin-top:8px">💡 Bring a sample to the counter — the final rate is confirmed after a quick quality check.</p>';
+    out.classList.add('show');
+    toast('Quote ready ✨');
+  }
+
+  // --- Hero carousel (same dot-timeline logic as the mockup) ---
+  (function initHero(){
+    var track = document.getElementById('heroTrack');
+    if (!track) return;
+    var dots = Array.prototype.slice.call(document.querySelectorAll('.hero-dot'));
+    var n = dots.length, i = 0, timer;
+    function go(k){
+      i = (k + n) % n;
+      track.style.transform = 'translateX(-' + (i * 100) + '%)';
+      dots.forEach(function(d, j){
+        d.classList.remove('on');
+        void d.offsetWidth;
+        if (j === i) d.classList.add('on');
+      });
+    }
+    function auto(){ clearInterval(timer); timer = setInterval(function(){ go(i + 1); }, 4500); }
+    dots.forEach(function(d, j){ d.addEventListener('click', function(){ go(j); auto(); }); });
+    var sx = null;
+    track.addEventListener('touchstart', function(e){ sx = e.touches[0].clientX; }, { passive: true });
+    track.addEventListener('touchend', function(e){
+      if (sx === null) return;
+      var dx = e.changedTouches[0].clientX - sx;
+      if (Math.abs(dx) > 40) go(i + (dx < 0 ? 1 : -1));
+      sx = null; auto();
+    }, { passive: true });
+    go(0); auto();
+  })();
+`
+
+
+
+
 export const HomePage: FC<{
   featuredProducts: ProductCardData[]
   categories: HomeCategory[]
@@ -204,7 +300,7 @@ export const HomePage: FC<{
   <h3 style="font-size:17px;font-weight:800;margin-bottom:12px">
     What would you like to do?
   </h3>
-  <div style="display:flex;flex-wrap:nowrap;gap:12px;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;padding-bottom:4px;">
+  <div style="display:flex;flex-wrap:nowrap;gap:12px;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;padding-bottom:4px;scrollbar-width: none;">
     {qcCards.map((card) =>
       card.href ? (
         <a
@@ -373,94 +469,3 @@ export const HomePage: FC<{
   )
 }
 
-// Home-page-only client logic: the grinding calculator (ported straight
-// from the mockup, same GRIND_RATES) and the new sell-to-store
-// calculator. Neither touches D1 — SELL_RATES below is an illustrative
-// starting point, edit freely.
-const HOME_SCRIPT = `
-  function rupee(n){ return '₹' + Math.round(n).toLocaleString('en-IN'); }
-
-  var GRIND_RATES = { wheat:4, multigrain:5, millet:6, besan:5, rice:4, spice:8 }; // ₹/kg
-  var GRIND_LABELS = { wheat:'Wheat', multigrain:'Multigrain mix', millet:'Millets', besan:'Chana dal → besan', rice:'Rice', spice:'Spices' };
-
-  function toggleChip(el){ el.classList.toggle('on'); }
-
-  function calcQuote(e){
-    e.preventDefault();
-    var grain = document.getElementById('c-grain').value;
-    var kg = Math.max(1, parseFloat(document.getElementById('c-kg').value) || 0);
-    var fine = document.getElementById('c-fine').classList.contains('on');
-    var rate = GRIND_RATES[grain] + (fine ? 1 : 0);
-    var total = rate * kg;
-    var out = document.getElementById('calcOut');
-    out.innerHTML =
-      '<div class="row"><span>Grain</span><b>' + GRIND_LABELS[grain] + '</b></div>' +
-      '<div class="row"><span>Quantity</span><b>' + kg + ' kg</b></div>' +
-      '<div class="row"><span>Grinding @ ₹' + rate + '/kg</span><b>' + rupee(total) + '</b></div>' +
-      '<div class="row total"><span>Total</span><b>' + rupee(total) + '</b></div>' +
-      '<p style="font-size:11px;color:var(--color-muted);margin-top:8px">💡 Drop your grain at the store and collect fresh flour — final quote confirmed at the counter.</p>';
-    out.classList.add('show');
-    toast('Quote ready ✨');
-  }
-
-  // --- Sell to store — illustrative rates, tune freely ---
-  var SELL_RATES = { wheat:22, mustard:52, soybean:45, chana:68, bajra:24, jowar:26, maize:20 }; // ₹/kg, Grade A
-  var SELL_LABELS = { wheat:'Wheat', mustard:'Mustard', soybean:'Soybean', chana:'Chana (Gram)', bajra:'Bajra', jowar:'Jowar', maize:'Maize' };
-  var GRADE_MULTIPLIER = { a:1, b:0.92, c:0.8 };
-  var GRADE_LABEL = { a:'A · Clean & dry', b:'B · Average', c:'C · Needs cleaning' };
-
-  function selectGrade(el){
-    var row = document.getElementById('s-grade-row');
-    row.querySelectorAll('.chip').forEach(function(c){ c.classList.remove('on'); });
-    el.classList.add('on');
-  }
-
-  function sellQuote(e){
-    e.preventDefault();
-    var grain = document.getElementById('s-grain').value;
-    var kg = Math.max(1, parseFloat(document.getElementById('s-kg').value) || 0);
-    var gradeBtn = document.querySelector('#s-grade-row .chip.on');
-    var grade = gradeBtn ? gradeBtn.dataset.grade : 'a';
-    var baseRate = SELL_RATES[grain] || 0;
-    var perKg = baseRate * (GRADE_MULTIPLIER[grade] || 1);
-    var total = perKg * kg;
-    var out = document.getElementById('sellOut');
-    out.innerHTML =
-      '<div class="row"><span>Grain</span><b>' + SELL_LABELS[grain] + '</b></div>' +
-      '<div class="row"><span>Quantity</span><b>' + kg + ' kg</b></div>' +
-      '<div class="row"><span>Quality grade</span><b>' + GRADE_LABEL[grade] + '</b></div>' +
-      '<div class="row"><span>Rate @ ₹' + perKg.toFixed(2) + '/kg</span><b>' + rupee(total) + '</b></div>' +
-      '<div class="row total"><span>Estimated payout</span><b>' + rupee(total) + '</b></div>' +
-      '<p style="font-size:11px;color:var(--color-muted);margin-top:8px">💡 Bring a sample to the counter — the final rate is confirmed after a quick quality check.</p>';
-    out.classList.add('show');
-    toast('Quote ready ✨');
-  }
-
-  // --- Hero carousel (same dot-timeline logic as the mockup) ---
-  (function initHero(){
-    var track = document.getElementById('heroTrack');
-    if (!track) return;
-    var dots = Array.prototype.slice.call(document.querySelectorAll('.hero-dot'));
-    var n = dots.length, i = 0, timer;
-    function go(k){
-      i = (k + n) % n;
-      track.style.transform = 'translateX(-' + (i * 100) + '%)';
-      dots.forEach(function(d, j){
-        d.classList.remove('on');
-        void d.offsetWidth;
-        if (j === i) d.classList.add('on');
-      });
-    }
-    function auto(){ clearInterval(timer); timer = setInterval(function(){ go(i + 1); }, 4500); }
-    dots.forEach(function(d, j){ d.addEventListener('click', function(){ go(j); auto(); }); });
-    var sx = null;
-    track.addEventListener('touchstart', function(e){ sx = e.touches[0].clientX; }, { passive: true });
-    track.addEventListener('touchend', function(e){
-      if (sx === null) return;
-      var dx = e.changedTouches[0].clientX - sx;
-      if (Math.abs(dx) > 40) go(i + (dx < 0 ? 1 : -1));
-      sx = null; auto();
-    }, { passive: true });
-    go(0); auto();
-  })();
-`

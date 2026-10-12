@@ -85,12 +85,12 @@ export const ProductCard: FC<{
             <form hx-post={`/api/cart/adjust/${product.id}`} hx-target="#cart-count" hx-swap="innerHTML">
               <input type="hidden" name="delta" value={sizeKg} />
               <button type="submit" class="addbtn" onclick={flyFromThisCard}>
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
+              Add<svg viewBox="0 0 24 24" width="36" height="30" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M2 3h2l.4 2M5.5 14h11l3-8H5.4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
     <circle cx="8" cy="19" r="1.6" fill="currentColor"/>
     <circle cx="16" cy="19" r="1.6" fill="currentColor"/>
     <path d="M14 7.5v4M12 9.5h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-  </svg>
+  </svg> 
               </button>
             </form>
           )}

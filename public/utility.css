@@ -30,6 +30,53 @@
   --duration-base:220ms;
   --nav-h:64px;
 }
+
+
+
+/* extra added css for  bugs */
+/* 1. Fade out the full card uniformly when out of stock */
+.pcard.out-of-stock {
+  opacity: 0.55;
+  filter: grayscale(20%);
+  pointer-events: none; /* Stops user interaction */
+}
+
+/* 2. Push it into the normal flow so it sits underneath the price instead of floating over it */
+.pcard.out-of-stock .addrow {
+  position: static !important;  /* Disables the absolute position coordinates */
+  width: 100% !important;       /* Uses full text container width */
+  height: 32px !important;      /* Comfortable height for a banner */
+  margin-top: 12px !important;  /* Generates a clean gap between the price and the banner */
+}
+
+/* 3. Re-style the button into a wide banner layout instead of a round corner bubble */
+.pcard.out-of-stock .addbtn {
+  font-size: 11px !important;     /* Shrinks the 33px icon size down to readable text size */
+  font-weight: 700 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-radius: 6px !important;  /* Removes the 20% round circle design */
+  background: var(--color-primary) !important; /* Changes primary theme color to a muted gray */
+  color: #fff !important;      /* Neutral contrast text color */
+  box-shadow: none !important;    /* Drops the floating action button shadow */
+  padding: 0 8px !important;
+  display: flex !important;       /* Switch to flex layout to center text cleanly */
+  align-items: center !important;
+  justify-content: center !important;
+  
+  /* Prevent layout shifts or text breaks if string changes */
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+
+
+
+
+
+
+
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{scroll-behavior:smooth}
 body{
@@ -141,57 +188,55 @@ h1,h2,h3,h4{color:var(--color-ink)}
 /* add / stepper */
 
 /* add / stepper */
+/* ===== Action row: same slot for Add / Stepper / Out of stock ===== */
 .addrow{
-  position:absolute;
-  bottom:9px;
-  right:8px;
-  margin-top:0;
-  height:20px;
-  width:30px;
+  position:static;          /* normal flow, sits under the price */
   display:flex;
+  width:100%;
+  height:32px;
+  margin-top:10px;
   z-index:2;
 }
 
+/* ===== Add button ===== */
 .addbtn{
   flex:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
   background:var(--color-primary);
   color:#fff;
+  font-size:18px;           /* works for "+" or "ADD" text */
   font-weight:800;
-  font-size:33px;
-  padding: 3.3px;
   line-height:1;
-  border-radius:20%;
-  letter-spacing:0;
-  display:grid;
-  place-items:center;
+  padding:0 8px;
   border:none;
+  border-radius:8px;
+  letter-spacing:0;
   cursor:pointer;
-  transition:transform var(--duration-fast), background var(--duration-base);
   box-shadow:var(--shadow-sm);
+  transition:transform var(--duration-fast), background var(--duration-base);
 }
-.addbtn:active{transform:scale(.94)}
 .addbtn:hover{background:var(--color-primary-dark)}
+.addbtn:active{transform:scale(.97)}
 
-/* Stepper: hangs half in / half out of the card's bottom-right corner */
+/* ===== Stepper (replaces the add button in the same slot) ===== */
 .stepper{
-  position:absolute;
-  bottom:-15px;        /* half of its own 30px height pokes below the card */
-  right:1px;
   display:none;
+  flex:1;
+  height:100%;
   align-items:center;
   justify-content:space-between;
   background:var(--color-primary);
-  border-radius:16px;
   color:#fff;
+  border-radius:8px;
   overflow:hidden;
-  width:78px;
-  height:27px;
-  box-shadow:var(--shadow-md);
+  box-shadow:var(--shadow-sm);
 }
 .stepper button{
-  width:25px;
-  height:27px;
-  font-size:14px;
+  width:36px;
+  height:100%;
+  font-size:16px;
   font-weight:800;
   color:#fff;
   border:none;
@@ -200,17 +245,45 @@ h1,h2,h3,h4{color:var(--color-ink)}
   transition:background var(--duration-fast);
 }
 .stepper button:active{background:rgba(0,0,0,.15)}
-.stepper b{font-size:12px;min-width:16px;text-align:center}
+.stepper b{
+  flex:1;
+  font-size:13px;
+  text-align:center;
+}
 
+/* In cart: swap button for stepper, same row, same size */
 .pcard.in-cart .addbtn{display:none}
-.pcard.in-cart .addrow{width:auto;height:auto;position:static}
-.pcard.in-cart .stepper{display:flex;animation:stepIn .25s cubic-bezier(.34,1.6,.5,1)}
+.pcard.in-cart .stepper{
+  display:flex;
+  animation:stepIn .25s cubic-bezier(.34,1.6,.5,1);
+}
 
+/* ===== Out of stock ===== */
+.pcard.out-of-stock{
+  opacity:.55;
+  filter:grayscale(20%);
+  pointer-events:none;
+}
+.pcard.out-of-stock .stepper{display:none}
+.pcard.out-of-stock .addbtn{
+  display:flex;
+  background:#f3f4f6;
+  color:#6b7280;
+  font-size:11px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.5px;
+  box-shadow:none;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+/* ===== Animations ===== */
 @keyframes stepIn{from{transform:scale(.7) translateY(6px);opacity:0}}
 
 .qty-bump{animation:bump .3s cubic-bezier(.34,1.8,.5,1)}
 @keyframes bump{40%{transform:scale(1.35)}}
-
 
 
 /* ---------- CTA duo ---------- */
@@ -330,59 +403,398 @@ h1,h2,h3,h4{color:var(--color-ink)}
   background:var(--color-primary)}
 
 /* ---------- Bottom-sheet modals (calc + cart) ---------- */
-.modal-back{position:fixed;inset:0;background:rgba(33,27,23,.5);backdrop-filter:blur(4px);z-index:100;
-  display:grid;place-items:end center;opacity:0;pointer-events:none;transition:opacity .25s}
+
+/* ===== Modal base ===== */
+.modal-back{
+  position:fixed;
+  inset:0;
+  background:rgba(33,27,23,.5);
+  backdrop-filter:blur(4px);
+  z-index:100;
+  display:grid;
+  place-items:end center;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .25s;
+}
 .modal-back.open{opacity:1;pointer-events:auto}
-.modal{background:var(--color-bg);width:100%;max-width:480px;border-radius:22px 22px 0 0;padding:20px 18px 26px;
-  transform:translateY(100%);transition:transform .35s cubic-bezier(.34,1.2,.5,1);
-  max-height:88vh;overflow-y:auto;position:relative}
+
+.modal{
+  background:var(--color-bg);
+  width:100%;
+  max-width:480px;
+  border-radius:22px 22px 0 0;
+  padding:20px 18px 26px;
+  transform:translateY(100%);
+  transition:transform .35s cubic-bezier(.34,1.2,.5,1);
+  max-height:88vh;
+  overflow-y:auto;
+  position:relative;
+}
 .modal.tall{max-height:92vh}
 .modal-back.open .modal{transform:none}
-.modal .grab{width:40px;height:4px;border-radius:var(--radius-round);background:#ddd;margin:0 auto 14px}
-.modal h3{font-size:18px;font-weight:800;display:flex;align-items:center;gap:8px}
+
+.modal .grab{
+  width:40px;
+  height:4px;
+  border-radius:var(--radius-round);
+  background:#ddd;
+  margin:0 auto 14px;
+}
+.modal h3{
+  font-size:18px;
+  font-weight:800;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding-right:44px;
+}
 .modal .sub{font-size:12px;color:var(--color-muted);margin:4px 0 16px}
-.modal-close{position:absolute;top:14px;right:16px;width:32px;height:32px;border-radius:50%;
-  background:var(--color-gold-light);display:grid;place-items:center;font-size:16px;font-weight:700;color:var(--color-ink)}
+
+.modal-close{
+  position:absolute;
+  top:14px;
+  right:16px;
+  width:32px;
+  height:32px;
+  border-radius:50%;
+  background:var(--color-gold-light);
+  display:grid;
+  place-items:center;
+  font-size:16px;
+  font-weight:700;
+  color:var(--color-ink);
+  border:none;
+  cursor:pointer;
+}
+
+/* ===== Form fields / calculator ===== */
 .field{margin-bottom:13px}
-.field label{font-size:12px;font-weight:700;display:block;margin-bottom:5px;color:var(--color-ink)}
-.field select,.field input{width:100%;padding:11px 13px;border-radius:var(--radius-crisp);border:1.5px solid var(--color-border);
-  background:var(--color-surface);font-size:14px;font-family:inherit;outline:none;color:var(--color-ink)}
-.field select:focus,.field input:focus{border-color:var(--color-primary)}
+.field label{
+  font-size:12px;
+  font-weight:700;
+  display:block;
+  margin-bottom:5px;
+  color:var(--color-ink);
+}
+.field select,
+.field input{
+  width:100%;
+  padding:11px 13px;
+  border-radius:var(--radius-crisp);
+  border:1.5px solid var(--color-border);
+  background:var(--color-surface);
+  font-size:14px;
+  font-family:inherit;
+  outline:none;
+  color:var(--color-ink);
+}
+.field select:focus,
+.field input:focus{border-color:var(--color-primary)}
+
 .chiprow{display:flex;gap:8px;flex-wrap:wrap}
-.chip{padding:8px 14px;border-radius:var(--radius-round);background:var(--color-surface);border:1.5px solid var(--color-border);
-  font-size:12.5px;font-weight:700;transition:all var(--duration-base);color:var(--color-body)}
+.chip{
+  padding:8px 14px;
+  border-radius:var(--radius-round);
+  background:var(--color-surface);
+  border:1.5px solid var(--color-border);
+  font-size:12.5px;
+  font-weight:700;
+  transition:all var(--duration-base);
+  color:var(--color-body);
+}
 .chip.on{background:var(--color-ink);color:#fff;border-color:var(--color-ink)}
-.calc-out{margin-top:16px;background:var(--color-surface);border-radius:var(--radius-soft);border:1.5px dashed var(--color-primary);
-  padding:16px;display:none;animation:rise .4s}
+
+.calc-out{
+  margin-top:16px;
+  background:var(--color-surface);
+  border-radius:var(--radius-soft);
+  border:1.5px dashed var(--color-primary);
+  padding:16px;
+  display:none;
+  animation:rise .4s;
+}
 .calc-out.show{display:block}
 .calc-out .row{display:flex;justify-content:space-between;font-size:13px;padding:4px 0}
-.calc-out .row.total{border-top:1px dashed var(--color-border);margin-top:6px;padding-top:10px;font-weight:800;font-size:16px}
+.calc-out .row.total{
+  border-top:1px dashed var(--color-border);
+  margin-top:6px;
+  padding-top:10px;
+  font-weight:800;
+  font-size:16px;
+}
 .calc-out .row.total b{color:var(--color-primary)}
-.modal-go{width:100%;margin-top:14px;background:var(--color-primary);color:#fff;padding:14px;border-radius:var(--radius-crisp);
-  font-weight:800;font-size:14px;letter-spacing:.05em;transition:transform var(--duration-fast)}
-.modal-go:active{transform:scale(.97)}
 
-/* cart sheet rows */
-.cart-list{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
-.cart-item{display:flex;align-items:center;gap:10px;background:var(--color-surface);
-  border:1.5px solid var(--color-border);border-radius:var(--radius-soft);padding:9px 10px;animation:rise .3s backwards}
-.cart-item .ci-img{width:46px;height:46px;flex:none;border-radius:8px;display:grid;place-items:center;font-size:24px}
-.cart-item .ci-mid{flex:1;min-width:0}
-.cart-item .ci-mid b{font-size:12px;display:block;color:var(--color-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cart-item .ci-mid span{font-size:10.5px;color:var(--color-muted)}
-.cart-item .ci-step{display:flex;align-items:center;background:var(--color-primary-light);
-  border-radius:var(--radius-crisp);overflow:hidden}
-.cart-item .ci-step button{width:26px;height:26px;font-weight:800;color:var(--color-primary-dark);font-size:14px}
-.cart-item .ci-step b{font-size:12px;min-width:20px;text-align:center;color:var(--color-primary-dark)}
-.cart-item .ci-price{font-size:12.5px;font-weight:800;color:var(--color-ink);min-width:52px;text-align:right}
-.bill{background:var(--color-surface);border:1.5px solid var(--color-border);border-radius:var(--radius-soft);padding:14px}
+.modal-go{
+  width:100%;
+  margin-top:14px;
+  background:var(--color-primary);
+  color:#fff;
+  padding:14px;
+  border:none;
+  border-radius:var(--radius-crisp);
+  font-weight:800;
+  font-size:14px;
+  letter-spacing:.05em;
+  cursor:pointer;
+  transition:transform var(--duration-fast);
+}
+.modal-go:active{transform:scale(.97)}
+/* ===== Cart sheet rows ===== */
+/* ===== Cart sheet rows ===== */
+.cart-list{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  margin-bottom:14px;
+}
+
+/* image | name + price line | stepper | price + trash */
+.cart-item{
+  display:grid;
+  grid-template-columns:48px minmax(0,1fr) auto auto;
+  grid-template-areas:
+    "img  name  step  price"
+    "img  meta  step  remove"
+    "warn warn  warn  warn";
+  grid-template-rows:auto auto auto;
+  column-gap:10px;
+  row-gap:0;
+  align-items:center;
+  background:var(--color-surface);
+  border:1.5px solid var(--color-border);
+  border-radius:var(--radius-soft);
+  padding:12px;
+  animation:rise .3s backwards;
+}
+
+/* dissolve the wrapper so its children sit on the main grid */
+.cart-item .ci-mid{display:contents}
+
+/* ----- image ----- */
+.cart-item .ci-img{
+  grid-area:img;
+  align-self:start;
+  width:48px;
+  height:48px;
+  border-radius:10px;
+  overflow:hidden;
+  display:grid;
+  place-items:center;
+  font-size:24px;
+  background:var(--color-primary-light);
+}
+.cart-item .ci-img img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+
+/* ----- name ----- */
+.cart-item .ci-mid > b{
+  grid-area:name;
+  align-self:end;
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+  font-size:13px;
+  font-weight:800;
+  line-height:1.3;
+  color:var(--color-ink);
+}
+
+/* ----- price line (₹200 ₹40/kg 80% OFF) ----- */
+.cart-item .ci-mid > span{
+  grid-area:meta;
+  align-self:start;
+  margin-top:3px;
+  font-size:10.5px;
+  line-height:1.5;
+  color:var(--color-muted);
+}
+.cart-item .ci-mid > span s{opacity:.8}
+
+.cart-item .save-tag{
+  display:inline-block;
+  margin-left:6px;
+  padding:1px 6px;
+  border-radius:var(--radius-round);
+  background:rgba(22,163,74,.12);
+  color:var(--color-success);
+  font-size:9.5px;
+  font-weight:800;
+  letter-spacing:.03em;
+  vertical-align:1px;
+}
+
+/* ----- stepper (the form) ----- */
+.cart-item .ci-step{
+  grid-area:step;
+  
+  align-self:center;
+  display:inline-flex;
+  align-items:center;
+  width:fit-content;
+  height:28px;
+  margin:0;
+  background:var(--color-primary-light);
+  border-radius:var(--radius-crisp);
+  overflow:hidden;
+}
+.cart-item .ci-step__btn{
+  width:26px;
+  height:28px;
+  
+  padding:0;
+  border:none;
+  background:transparent;
+  display:grid;
+  place-items:center;
+  font-size:16px;
+  font-weight:800;
+  line-height:1;
+  color:var(--color-primary-dark);
+  cursor:pointer;
+  transition:background var(--duration-fast), opacity var(--duration-fast);
+}
+.cart-item .ci-step__btn:active:not(:disabled){background:rgba(0,0,0,.1)}
+.cart-item .ci-step__btn:disabled{
+  opacity:.3;
+  cursor:not-allowed;
+}
+.cart-item .ci-step__input{
+  width:30px;
+  height:28px;
+  padding:0;
+  margin:0;
+  border:none;
+  border-radius:0;
+  background:transparent;
+  text-align:center;
+  font-family:inherit;
+  font-size:12.5px;
+  font-weight:800;
+  color:var(--color-primary-dark);
+  outline:none;
+  -moz-appearance:textfield;
+  appearance:textfield;
+}
+.cart-item .ci-step__input::-webkit-outer-spin-button,
+.cart-item .ci-step__input::-webkit-inner-spin-button{
+  -webkit-appearance:none;
+  margin:0;
+}
+.cart-item .ci-step__input:focus{background:rgba(255,255,255,.6)}
+
+/* ----- price (top right) ----- */
+.cart-item .ci-price{
+  grid-area:price;
+  justify-self:end;
+  align-self:end;
+  font-size:13.5px;
+  font-weight:800;
+  line-height:1.3;
+  color:var(--color-ink);
+  white-space:nowrap;
+}
+
+/* ----- remove button (under price) ----- */
+.cart-item .ci-remove{
+  grid-area:remove;
+  justify-self:end;
+  align-self:start;
+  width:28px;
+  height:28px;
+  padding:0;
+  border:none;
+  border-radius:8px;
+  background:transparent;
+  display:grid;
+  place-items:center;
+  color:var(--color-muted);
+  cursor:pointer;
+  transition:background var(--duration-fast), color var(--duration-fast);
+}
+.cart-item .ci-remove svg{
+  width:17px;
+  height:17px;
+  display:block;
+}
+.cart-item .ci-remove:hover,
+.cart-item .ci-remove:active{
+  background:rgba(220,38,38,.1);
+  color:#dc2626;
+}
+
+/* ----- max quantity / stock warning (own row underneath) ----- */
+.cart-item .ci-warn{
+  grid-area:warn;
+  justify-self:start;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  margin:8px 0 0;
+  padding:4px 9px 4px 6px;
+  border-radius:var(--radius-round);
+  background:#fff4e0;
+  border:1px solid #fcd9a0;
+  color:#b45309;
+  font-size:10.5px;
+  font-weight:700;
+  line-height:1.3;
+  animation:rise .25s backwards;
+}
+.cart-item .ci-warn::before{
+  content:"!";
+  flex:none;
+  width:14px;
+  height:14px;
+  border-radius:50%;
+  background:#f59e0b;
+  color:#fff;
+  display:grid;
+  place-items:center;
+  font-size:9px;
+  font-weight:900;
+  line-height:1;
+}
+
+/* very narrow phones */
+@media (max-width:360px){
+  .cart-item{
+    grid-template-columns:40px minmax(0,1fr) auto auto;
+    column-gap:8px;
+    padding:10px;
+  }
+  .cart-item .ci-img{width:40px;height:40px;font-size:20px}
+  .cart-item .ci-step__btn{width:24px}
+  .cart-item .ci-step__input{width:26px}
+}
+
+/* ===== Bill ===== */
+.bill{
+  background:var(--color-surface);
+  border:1.5px solid var(--color-border);
+  border-radius:var(--radius-soft);
+  padding:14px;
+}
 .bill .row{display:flex;justify-content:space-between;font-size:13px;padding:4px 0}
 .bill .row.save b{color:var(--color-success)}
-.bill .row.total{border-top:1.5px dashed var(--color-border);margin-top:6px;padding-top:10px;
-  font-weight:800;font-size:16px;color:var(--color-ink)}
+.bill .row.total{
+  border-top:1.5px dashed var(--color-border);
+  margin-top:6px;
+  padding-top:10px;
+  font-weight:800;
+  font-size:16px;
+  color:var(--color-ink);
+}
 .bill .row.total b{color:var(--color-primary)}
+
+/* ===== Empty state ===== */
 .cart-empty{text-align:center;padding:34px 10px;color:var(--color-muted)}
-.cart-empty .em{font-size:48px;display:block;margin-bottom:8px}
+.cart-empty .em{display:block;font-size:48px;margin-bottom:8px}
 
 /* ---------- Toast ---------- */
 .toast{position:fixed;left:50%;bottom:calc(var(--nav-h) + 76px);transform:translate(-50%,20px);
