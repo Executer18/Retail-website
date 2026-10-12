@@ -34,6 +34,87 @@ export type HomeCategory = {
   productCount: number
 }
 
+
+
+
+
+
+const qcCards = [
+  {
+    href: '/products',
+    icon: '🛍️',
+    title: 'Browse Products',
+    subtitle: 'Atta, millets, besan & more',
+    bg: '#ff8a3d',
+    color: '#4a2200',
+  },
+  {
+    onClick: 'calcModal',
+    icon: '⚙️',
+    title: 'Grinding Charges',
+    subtitle: 'Get an instant quote',
+    bg: '#3d8bff',
+    color: '#00224a',
+  },
+  {
+    onClick: 'sellModal',
+    icon: '💰',
+    title: 'Sell to Store',
+    subtitle: 'Get a payout quote',
+    bg: '#3dbf5c',
+    color: '#003d12',
+  },
+]
+
+const cardBaseStyle = `
+  flex: 0 0 auto;
+  width: 150px;
+  min-height: 110px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 2px;
+  padding: 16px;
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
+  text-align: left;
+  text-decoration: none;
+  position: relative;
+  overflow: hidden;
+  font-family: inherit;
+`
+
+const iconStyle = `
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 56px;
+  line-height: 1;
+  opacity: 0.42;
+  pointer-events: none;
+  z-index: 0;
+`
+
+const textWrapStyle = `
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 1;
+`
+
+const titleStyle = `display: block; font-size: 15px; font-weight: 800;`
+const subtitleStyle = `font-size: 12px; opacity: 0.85;`
+
+
+
+
+
+
+
 const MILLING_STEPS = [
   { title: 'Grain selection & cleaning', body: 'Every lot is sorted, de-stoned and winnowed before it touches the mill.' },
   { title: 'Sun conditioning', body: 'Grains rest at natural moisture — never over-dried, never chemically treated.' },
@@ -44,11 +125,12 @@ const MILLING_STEPS = [
 
 // ASSUMPTION: three photos dropped straight into /public/hero — nothing
 // fetched from D1 for the hero. Swap the src/alt/caption trio below for
-// your real files.
+// your real files. No .deco emoji here (unlike the mockup) — that's
+// meant to float over a flat color block, not a photo.
 const HERO_SLIDES = [
-  { src: '/hero/1.jpg', kicker: 'Fresh every morning', title: 'Stone-Ground Sharbati Atta', sub: 'Milled in front of you', deco: '🌾' },
-  { src: '/hero/2.jpg', kicker: 'Winter special', title: 'Millet Flours are Back', sub: 'Jowar · Bajra · Ragi — ground to order', deco: '🌱' },
-  { src: '/hero/3.jpg', kicker: 'Full transparency', title: 'Watch Your Grain Get Ground', sub: 'Live counter view · zero mixing guarantee', deco: '⚖️' },
+  { src: '/hero/1.jpg', kicker: 'Fresh every morning', title: 'Stone-Ground Sharbati Atta', sub: 'Milled in front of you' },
+  { src: '/hero/2.jpg', kicker: 'Winter special', title: 'Millet Flours are Back', sub: 'Jowar · Bajra · Ragi — ground to order' },
+  { src: '/hero/3.jpg', kicker: 'Full transparency', title: 'Watch Your Grain Get Ground', sub: 'Live counter view · zero mixing guarantee' },
 ]
 
 export const HomePage: FC<{
@@ -79,7 +161,6 @@ export const HomePage: FC<{
               <div class="bg">
                 <img src={slide.src} alt={slide.title} />
               </div>
-              <span class="deco">{slide.deco}</span>
               <div class="txt">
                 <div class="kicker">{slide.kicker}</div>
                 <h2>{slide.title}</h2>
@@ -119,25 +200,38 @@ export const HomePage: FC<{
 
       {/* ---------- Order your way (now 3 cards, horizontally scrollable) ---------- */}
       <section class="sec reveal">
-        <h3 style="font-size:17px;font-weight:800;margin-bottom:12px">What would you like to do?</h3>
-        <div class="cta-row">
-          <a class="cta-big cta-a" href="/products">
-            <b>Browse Products</b>
-            <span>Atta, millets, besan & more</span>
-            <span class="em">🛍️</span>
-          </a>
-          <button type="button" class="cta-big cta-b" onclick="openSheet('calcModal')">
-            <b>Grinding Charges</b>
-            <span>Get an instant quote</span>
-            <span class="em">⚙️</span>
-          </button>
-          <button type="button" class="cta-big cta-c" onclick="openSheet('sellModal')">
-            <b>Sell to Store</b>
-            <span>Get a payout quote</span>
-            <span class="em">💰</span>
-          </button>
-        </div>
-      </section>
+  <h3 style="font-size:17px;font-weight:800;margin-bottom:12px">
+    What would you like to do?
+  </h3>
+  <div style="display:flex;flex-wrap:nowrap;gap:12px;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;padding-bottom:4px;">
+    {qcCards.map((card) =>
+      card.href ? (
+        <a
+          href={card.href}
+          style={`${cardBaseStyle} background:${card.bg}; color:${card.color};`}
+        >
+          <span style={iconStyle} aria-hidden="true">{card.icon}</span>
+          <span style={textWrapStyle}>
+            <b style={titleStyle}>{card.title}</b>
+            <span style={subtitleStyle}>{card.subtitle}</span>
+          </span>
+        </a>
+      ) : (
+        <button
+          type="button"
+          onclick={`openSheet('${card.onClick}')`}
+          style={`${cardBaseStyle} background:${card.bg}; color:${card.color};`}
+        >
+          <span style={iconStyle} aria-hidden="true">{card.icon}</span>
+          <span style={textWrapStyle}>
+            <b style={titleStyle}>{card.title}</b>
+            <span style={subtitleStyle}>{card.subtitle}</span>
+          </span>
+        </button>
+      )
+    )}
+  </div>
+</section>
 
       {/* ---------- Featured products ---------- */}
       <section class="sec reveal">

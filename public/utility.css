@@ -36,7 +36,7 @@ body{
   font-family:var(--font-body);background:var(--color-bg);color:var(--color-body);
   padding-bottom:calc(var(--nav-h) + 20px);overflow-x:hidden;
 }
-img{max-width:100%;display:block}
+img{max-width:100%; display:block}
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
 a{color:inherit;text-decoration:none}
 ::selection{background:var(--color-primary-light)}
@@ -73,7 +73,7 @@ h1,h2,h3,h4{color:var(--color-ink)}
 .catstrip::-webkit-scrollbar{display:none}
 .catpill{display:flex;flex-direction:column;align-items:center;gap:6px;flex:none;width:64px}
 .catpill .ic{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;font-size:26px;
-  background:var(--color-surface);border:1.5px solid var(--color-border);box-shadow:var(--shadow-sm);
+  backgrond:var(--color-surface);border:1.5px solid var(--color-border);box-shadow:var(--shadow-sm);
   transition:transform var(--duration-base), border-color var(--duration-base)}
 .catpill:active .ic{transform:scale(.92)}
 .catpill span{font-size:11px;font-weight:600;color:var(--color-muted);text-align:center;line-height:1.2}
@@ -123,15 +123,15 @@ h1,h2,h3,h4{color:var(--color-ink)}
 
 /* ---------- Product cards ---------- */
 .prodgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px}
-.pcard{background:var(--color-surface);border-radius:var(--radius-soft);border:1.5px solid var(--color-border);overflow:hidden;
+.pcard{background:var(--color-surface);border-radius:var(--radius-soft);border:1.5px solid var(--color-border);overflow:visible;
   box-shadow:var(--shadow-sm);position:relative;transition:transform var(--duration-base), box-shadow var(--duration-base);
   animation:rise .45s backwards}
 .pcard:hover{transform:translateY(-3px);box-shadow:var(--shadow-md)}
-.pcard .img{height:92px;display:grid;place-items:center;font-size:44px;position:relative}
+.pcard .img{height:100px;display:grid;place-items:center;font-size:44px;position:relative;overflow: hidden;}
 .pcard .off{position:absolute;top:6px;left:6px;background:var(--color-success);color:#fff;font-size:9.5px;
   font-weight:800;padding:2px 6px;border-radius:var(--radius-crisp)}
 .pcard .body{padding:8px 9px 10px}
-.pcard .nm{font-size:12px;font-weight:700;line-height:1.25;height:30px;overflow:hidden;color:var(--color-ink)}
+.pcard .nm{font-size:12px;font-weight:700;line-height:1.25;height:15px;overflow:hidden;color:var(--color-ink)}
 .pcard .wt{font-size:10.5px;color:var(--color-muted);margin:2px 0 3px}
 .pcard .pr{font-size:13px;font-weight:800;color:var(--color-ink)}
 .pcard .pr s{font-size:10.5px;color:var(--color-muted);font-weight:500;margin-left:4px}
@@ -139,22 +139,79 @@ h1,h2,h3,h4{color:var(--color-ink)}
 .pcard .rating em{color:var(--color-muted);font-style:normal;font-weight:500}
 
 /* add / stepper */
-.addrow{margin-top:7px;height:30px;display:flex}
-.addbtn{flex:1;background:var(--color-primary);color:#fff;font-weight:800;font-size:12px;border-radius:var(--radius-crisp);
-  letter-spacing:.06em;transition:transform var(--duration-fast), background var(--duration-base)}
+
+/* add / stepper */
+.addrow{
+  position:absolute;
+  bottom:9px;
+  right:8px;
+  margin-top:0;
+  height:20px;
+  width:30px;
+  display:flex;
+  z-index:2;
+}
+
+.addbtn{
+  flex:1;
+  background:var(--color-primary);
+  color:#fff;
+  font-weight:800;
+  font-size:33px;
+  padding: 3.3px;
+  line-height:1;
+  border-radius:20%;
+  letter-spacing:0;
+  display:grid;
+  place-items:center;
+  border:none;
+  cursor:pointer;
+  transition:transform var(--duration-fast), background var(--duration-base);
+  box-shadow:var(--shadow-sm);
+}
 .addbtn:active{transform:scale(.94)}
 .addbtn:hover{background:var(--color-primary-dark)}
-.stepper{flex:1;display:none;align-items:center;justify-content:space-between;
-  background:var(--color-primary);border-radius:var(--radius-crisp);color:#fff;overflow:hidden}
-.stepper button{width:32px;height:30px;font-size:16px;font-weight:800;color:#fff;
-  transition:background var(--duration-fast)}
+
+/* Stepper: hangs half in / half out of the card's bottom-right corner */
+.stepper{
+  position:absolute;
+  bottom:-15px;        /* half of its own 30px height pokes below the card */
+  right:1px;
+  display:none;
+  align-items:center;
+  justify-content:space-between;
+  background:var(--color-primary);
+  border-radius:16px;
+  color:#fff;
+  overflow:hidden;
+  width:78px;
+  height:27px;
+  box-shadow:var(--shadow-md);
+}
+.stepper button{
+  width:25px;
+  height:27px;
+  font-size:14px;
+  font-weight:800;
+  color:#fff;
+  border:none;
+  background:transparent;
+  cursor:pointer;
+  transition:background var(--duration-fast);
+}
 .stepper button:active{background:rgba(0,0,0,.15)}
-.stepper b{font-size:13px;min-width:18px;text-align:center}
+.stepper b{font-size:12px;min-width:16px;text-align:center}
+
 .pcard.in-cart .addbtn{display:none}
+.pcard.in-cart .addrow{width:auto;height:auto;position:static}
 .pcard.in-cart .stepper{display:flex;animation:stepIn .25s cubic-bezier(.34,1.6,.5,1)}
-@keyframes stepIn{from{transform:scale(.7);opacity:0}}
+
+@keyframes stepIn{from{transform:scale(.7) translateY(6px);opacity:0}}
+
 .qty-bump{animation:bump .3s cubic-bezier(.34,1.8,.5,1)}
 @keyframes bump{40%{transform:scale(1.35)}}
+
+
 
 /* ---------- CTA duo ---------- */
 .cta-duo{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -716,6 +773,7 @@ h1,h2,h3,h4{color:var(--color-ink)}
 
 
 
+
 /* ==========================================================================
    Home / ProductCard integration additions — NOT part of the original
    mockup. Append this to the end of styles.css, after
@@ -728,6 +786,7 @@ h1,h2,h3,h4{color:var(--color-ink)}
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position:center;
   display: block;
 }
 .pcard.out-of-stock .img img,
@@ -751,6 +810,10 @@ h1,h2,h3,h4{color:var(--color-ink)}
 
 /* "What would you like to do?" — 3 cards, horizontally scrollable
    instead of the mockup's fixed 2-column grid. */
+
+
+
+
 .cta-row {
   display: flex;
   gap: 12px;
@@ -781,8 +844,13 @@ h1,h2,h3,h4{color:var(--color-ink)}
 }
 
 /* Real-photo hero slides — the mockup's .slide .bg was a flat CSS
-   gradient; this fills it with a photo plus a legibility gradient so
-   the kicker/title/sub text on top still reads clearly. */
+   gradient; this fills it with a photo instead. Just a short scrim at
+   the bottom so the kicker/title/sub text stays readable — not a full
+   dark wash over the whole photo, and the mockup's big rotating .deco
+   emoji is dropped for these slides entirely (it's meant to sit on a
+   flat color block; over an actual photo it just looks like something
+   broken floating on top). HomePage.tsx doesn't render .deco in the
+   hero anymore for this reason. */
 .slide .bg {
   background: var(--color-ink);
 }
@@ -795,8 +863,11 @@ h1,h2,h3,h4{color:var(--color-ink)}
 .slide .bg::after {
   content: '';
   position: absolute;
-  inset: 0;
-  background: linear-gradient(0deg, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.1) 55%, rgba(0, 0, 0, 0.25));
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 55%;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
 }
 
 /* Size-variant picker rows (products.ts' /api/products/:id/variants),

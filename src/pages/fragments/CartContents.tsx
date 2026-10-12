@@ -32,6 +32,8 @@ export type CartRow = {
   discountPct: number
   imageUrl: string | null
   inStockKg: number
+  /** This product's pack size in kg — the +/- stepper below steps by this amount, not a fixed 0.5kg, so a 5kg pack moves by 5kg per tap. */
+  sizeKg: number
   /** Set only on the row the update route just clamped, e.g. "Only 3kg available — adjusted." */
   warning?: string
 }
@@ -113,7 +115,7 @@ export const CartContents: FC<CartContentsProps> = ({ items, total, totalMrp, to
                     value={item.quantityKg}
                     min="0"
                     max={item.inStockKg}
-                    step="0.5"
+                    step={item.sizeKg}
                     class="ci-step__input"
                     onchange="this.form.requestSubmit()"
                     aria-label={`${item.name} quantity in kg`}

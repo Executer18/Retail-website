@@ -92,9 +92,11 @@ const LAYOUT_SCRIPT = `
     }
   });
 
-  // Fly-to-cart, for ANY "/api/cart/adjust/:productId" form — ProductCard's
-  // ADD button, its +/- stepper, and the size-variant popup's per-size ADD
-  // all post to that same route, so one listener covers all three.
+  // Clones imgEl (falls back to a 🌾 emoji span if there's no real image)
+  // and animates it from originEl's position to the cart icon. Called
+  // directly via onclick on ProductCard's ADD/+ buttons and the
+  // variant-picker's per-size rows — fires immediately on click rather
+  // than waiting on the htmx round-trip.
   function flyToCart(imgEl, originEl){
     var target = document.querySelector('.topbar .cart-btn') || document.getElementById('floatcart');
     if (!target || !originEl) return;
@@ -119,18 +121,13 @@ const LAYOUT_SCRIPT = `
     setTimeout(function(){ ghost.remove(); }, 720);
   }
 
+  // After a successful add from inside the size-variant modal, close it
+  // so the shopper sees the toast/fly animation land rather than
+  // staring at the picker.
   document.body.addEventListener('htmx:afterRequest', function(e){
     var elt = e.detail.elt;
     var path = (e.detail.requestConfig && e.detail.requestConfig.path) || '';
-    if (!e.detail.successful || path.indexOf('/api/cart/adjust/') === -1) return;
-    var deltaInput = elt.querySelector && elt.querySelector('input[name="delta"]');
-    var isIncrease = deltaInput && parseFloat(deltaInput.value) > 0;
-    if (isIncrease) {
-      var origin = elt.closest('.pcard, .variant-row');
-      var img = origin ? origin.querySelector('img') : null;
-      flyToCart(img, origin);
-    }
-    if (elt.closest('#variantModal')) {
+    if (e.detail.successful && path.indexOf('/api/cart/adjust/') > -1 && elt.closest('#variantModal')) {
       setTimeout(function(){ closeSheet('variantModal'); }, 450);
     }
   });
@@ -263,7 +260,7 @@ export const Layout: FC<LayoutProps> = ({
             <button class="modal-close" onclick="closeSheet('cartModal')">✕</button>
             <h3>🛒 Your Cart</h3>
             <p class="sub">Freshly ground, packed after you order · Store pickup only</p>
-            <div id="cart-body" hx-get="/api/cart/contents" hx-trigger="load"></div>
+            <div id="cart-body" hx-get="/api/cart/contents" hx-trigger="load, cart-updated from:body"></div>
           </div>
         </div>
 

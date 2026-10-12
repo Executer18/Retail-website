@@ -27,6 +27,8 @@ import { cartItems, products } from '../db/schema'
 import type { Env, Variables } from '../db'
 import { CartContents, rupee, type CartRow } from '../pages/fragments/CartContents'
 import { CartPage } from '../pages/CartPage'
+import { ProductCard } from '../components/ProductCard'
+import { groupBySizeVariants } from '../lib/product-variants'
 
 export const cartRoutes = new Hono<{ Bindings: Env; Variables: Variables }>()
 
@@ -41,6 +43,7 @@ async function loadCartWithProducts(db: ReturnType<typeof getDB>, sessionId: str
       discount: products.discount,
       imageUrl: products.imageUrl,
       inStockKg: products.inStockKg,
+      size: products.size,
     })
     .from(cartItems)
     .innerJoin(products, eq(cartItems.productId, products.productId))
@@ -62,6 +65,10 @@ async function loadCartWithProducts(db: ReturnType<typeof getDB>, sessionId: str
       discountPct,
       imageUrl: r.imageUrl,
       inStockKg: r.inStockKg,
+      // Each +/- tap in the cart should move by one whole pack, not an
+      // arbitrary fraction — a 1kg product steps by 1kg, a 5kg product
+      // steps by 5kg. Falls back to 1 if size was never set.
+      sizeKg: r.size ?? 1,
     }
   })
 
@@ -72,7 +79,29 @@ async function loadCartWithProducts(db: ReturnType<typeof getDB>, sessionId: str
   return { items, total, totalMrp, totalSavings }
 }
 
+
+async function renderCardOob(db: ReturnType<typeof getDB>, productId: number, nextQty: number) {
+  const [product] = await db.select().from(products).where(eq(products.productId, productId))
+  if (!product) return null
+
+  const siblings = await db.select().from(products).where(eq(products.itemName, product.itemName))
+  const [family] = groupBySizeVariants(siblings)
+  const clickedVariant = family?.variants.find((v) => v.id === productId)
+  if (!family || !clickedVariant) return null
+
+  const cardForClicked = {
+    ...family,
+    id: clickedVariant.id,
+    pricePerKg: clickedVariant.pricePerKg,
+    inStockKg: clickedVariant.inStockKg,
+    discountPct: clickedVariant.discountPct,
+  }
+
+  return <ProductCard product={cardForClicked} currentQtyKg={nextQty} oob />
+}
+
 // ---------- Add to cart ----------
+
 cartRoutes.post('/api/cart/add/:productId', async (c) => {
   const db = getDB(c.env)
   const sessionId = c.get('sessionId')
@@ -114,59 +143,29 @@ cartRoutes.post('/api/cart/add/:productId', async (c) => {
   return c.html(`${itemCount}${warningHtml}`)
 })
 
-// ---------- Adjust by product id (ProductCard's ADD button and +/- stepper,
-// and the size-variant popup — anywhere a card shows a live qty for one
-// product, not a cart-line id). delta is +1/-1 from a hidden form field. ----------
-cartRoutes.post('/api/cart/adjust/:productId', async (c) => {
-  const db = getDB(c.env)
-  const sessionId = c.get('sessionId')
-  const productId = parseInt(c.req.param('productId'), 10)
-
-  const body = await c.req.parseBody()
-  const delta = parseFloat(String(body.delta ?? '0'))
-
-  const [product] = await db.select().from(products).where(eq(products.productId, productId))
-  if (!product) return c.text('Product not found', 404)
-
-  const [existing] = await db
-    .select()
-    .from(cartItems)
-    .where(and(eq(cartItems.sessionId, sessionId), eq(cartItems.productId, productId)))
-
-  const nextQty = Math.max(0, Math.min((existing?.quantityKg ?? 0) + delta, product.inStockKg))
-
-  if (nextQty <= 0) {
-    if (existing) {
-      await db.delete(cartItems).where(and(eq(cartItems.sessionId, sessionId), eq(cartItems.productId, productId)))
-    }
-  } else {
-    await db
-      .insert(cartItems)
-      .values({ sessionId, productId, quantityKg: nextQty })
-      .onConflictDoUpdate({
-        target: [cartItems.sessionId, cartItems.productId],
-        set: { quantityKg: nextQty },
-      })
-  }
-
-  c.header('HX-Trigger', 'cart-updated')
-  return c.html(<AddRow productId={productId} quantityKg={nextQty} inStockKg={product.inStockKg} />)
-})
-
-// ---------- Adjust by a small delta (ProductCard's ADD button, and each
-// row of the size-variant picker modal) ----------
+// ---------- Adjust by a small delta (ProductCard's ADD button, its
+// +/- stepper, and each row of the size-variant picker modal) ----------
 // Separate from /api/cart/add above: that route takes an arbitrary
 // quantityKg (ProductDetailPage, where the shopper picks an exact
 // amount before adding). This one just nudges by +/-delta kg from
-// whatever's already in the cart for that product — a plain repeatable
-// tap, since the product grid has no cartItemId to update by.
+// whatever's already in the cart for that product — delta is that
+// variant's own pack size (sent as a hidden form field by ProductCard),
+// not a flat kg amount.
+//
+// Every caller targets #cart-count as the primary swap (hx-target), so
+// this always returns the new item count for that. The card that
+// actually changed is re-rendered as a *second*, out-of-band element
+// (id={`pcard-${variantId}`}, hx-swap-oob="true") — htmx updates it in
+// place if a card with that id is on the current page, and silently
+// ignores it otherwise (e.g. when the request came from the
+// size-variant modal for a size that isn't the one shown on the grid).
 cartRoutes.post('/api/cart/adjust/:productId', async (c) => {
   const db = getDB(c.env)
   const sessionId = c.get('sessionId')
   const productId = parseInt(c.req.param('productId'), 10)
 
   const body = await c.req.parseBody()
-  const delta = parseFloat(String(body.delta ?? '1')) || 1
+  const delta = parseFloat(String(body.delta ?? '0')) || 0
 
   const [product] = await db.select().from(products).where(eq(products.productId, productId))
   if (!product) {
@@ -193,15 +192,40 @@ cartRoutes.post('/api/cart/adjust/:productId', async (c) => {
     await db.insert(cartItems).values({ sessionId, productId, quantityKg: nextQty })
   }
 
+  // Rebuild the card around the SPECIFIC variant that was just adjusted
+  // (not whichever sibling groupBySizeVariants would otherwise default
+  // to), so the stepper reflects the exact size the shopper tapped.
+  const siblings = await db.select().from(products).where(eq(products.itemName, product.itemName))
+  const [family] = groupBySizeVariants(siblings)
+  const clickedVariant = family?.variants.find((v) => v.id === productId)
+  const cardForClicked =
+    family && clickedVariant
+      ? {
+          ...family,
+          id: clickedVariant.id,
+          pricePerKg: clickedVariant.pricePerKg,
+          inStockKg: clickedVariant.inStockKg,
+          discountPct: clickedVariant.discountPct,
+        }
+      : null
+
   const { items } = await loadCartWithProducts(db, sessionId)
   const itemCount = items.length
 
-  const warningHtml = wasClamped
-    ? `<span id="cart-add-feedback" hx-swap-oob="true" class="cart-add-feedback cart-add-feedback--visible">Only ${product.inStockKg}kg available — added the maximum.</span>`
-    : `<span id="cart-add-feedback" hx-swap-oob="true" class="cart-add-feedback"></span>`
-
   c.header('HX-Trigger', 'cart-updated')
-  return c.html(`${itemCount}${warningHtml}`)
+  return c.html(
+    <>
+      {itemCount}
+      <span
+        id="cart-add-feedback"
+        hx-swap-oob="true"
+        class={`cart-add-feedback${wasClamped ? ' cart-add-feedback--visible' : ''}`}
+      >
+        {wasClamped ? `Only ${product.inStockKg}kg available — added the maximum.` : ''}
+      </span>
+      {cardForClicked && <ProductCard product={cardForClicked} currentQtyKg={nextQty} oob />}
+    </>
+  )
 })
 
 // ---------- Cart count (Layout's header badge) ----------
@@ -248,26 +272,28 @@ cartRoutes.post('/api/cart/update/:cartItemId', async (c) => {
   const requestedKg = parseFloat(String(body.quantityKg ?? '1'))
 
   let clampedTo: number | null = null
+  let cardOob = null
+
+  const [row] = await db
+    .select({ productId: cartItems.productId })
+    .from(cartItems)
+    .where(and(eq(cartItems.cartItemId, cartItemId), eq(cartItems.sessionId, sessionId)))
 
   if (requestedKg <= 0) {
     await db.delete(cartItems).where(and(eq(cartItems.cartItemId, cartItemId), eq(cartItems.sessionId, sessionId)))
-  } else {
-    const [row] = await db
-      .select({ productId: cartItems.productId })
-      .from(cartItems)
+    if (row) cardOob = await renderCardOob(db, row.productId, 0)
+  } else if (row) {
+    const [product] = await db.select().from(products).where(eq(products.productId, row.productId))
+    const maxKg = product?.inStockKg ?? requestedKg
+    const clampedKg = Math.min(requestedKg, maxKg)
+    if (clampedKg < requestedKg) clampedTo = maxKg
+
+    await db
+      .update(cartItems)
+      .set({ quantityKg: clampedKg })
       .where(and(eq(cartItems.cartItemId, cartItemId), eq(cartItems.sessionId, sessionId)))
 
-    if (row) {
-      const [product] = await db.select().from(products).where(eq(products.productId, row.productId))
-      const maxKg = product?.inStockKg ?? requestedKg
-      const clampedKg = Math.min(requestedKg, maxKg)
-      if (clampedKg < requestedKg) clampedTo = maxKg
-
-      await db
-        .update(cartItems)
-        .set({ quantityKg: clampedKg })
-        .where(and(eq(cartItems.cartItemId, cartItemId), eq(cartItems.sessionId, sessionId)))
-    }
+    cardOob = await renderCardOob(db, row.productId, clampedKg)
   }
 
   const { items, total, totalMrp, totalSavings } = await loadCartWithProducts(db, sessionId)
@@ -278,8 +304,13 @@ cartRoutes.post('/api/cart/update/:cartItemId', async (c) => {
         )
       : items
 
-  c.header('HX-Trigger', 'cart-updated')
-  return c.html(<CartContents items={withWarning} total={total} totalMrp={totalMrp} totalSavings={totalSavings} />)
+    c.header('HX-Trigger', 'cart-updated')
+  return c.html(
+    <>
+      <CartContents items={withWarning} total={total} totalMrp={totalMrp} totalSavings={totalSavings} />
+      {cardOob}
+    </>
+  )
 })
 
 // ---------- Remove line ----------
@@ -288,11 +319,24 @@ cartRoutes.post('/api/cart/remove/:cartItemId', async (c) => {
   const sessionId = c.get('sessionId')
   const cartItemId = parseInt(c.req.param('cartItemId'), 10)
 
+    const [row] = await db
+    .select({ productId: cartItems.productId })
+    .from(cartItems)
+    .where(and(eq(cartItems.cartItemId, cartItemId), eq(cartItems.sessionId, sessionId)))
+
   await db.delete(cartItems).where(and(eq(cartItems.cartItemId, cartItemId), eq(cartItems.sessionId, sessionId)))
 
+  const cardOob = row ? await renderCardOob(db, row.productId, 0) : null
   const { items, total, totalMrp, totalSavings } = await loadCartWithProducts(db, sessionId)
   c.header('HX-Trigger', 'cart-updated')
-  return c.html(<CartContents items={items} total={total} totalMrp={totalMrp} totalSavings={totalSavings} />)
+  return c.html(
+    <>
+      <CartContents items={items} total={total} totalMrp={totalMrp} totalSavings={totalSavings} />
+      {cardOob}
+    </>
+  )
+
+
 })
 
 // ---------- Cart page (direct /cart visit — the modal is the primary path now) ----------

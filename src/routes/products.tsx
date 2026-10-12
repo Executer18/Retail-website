@@ -28,22 +28,28 @@ productRoutes.get('/api/products/:id/variants', async (c) => {
   const siblings = await db.select().from(products).where(eq(products.itemName, clicked.itemName))
   const variants = siblings.sort((a, b) => (a.size ?? 0) - (b.size ?? 0))
 
+  // flyFrom reads the shared thumbnail (#variant-modal-img) rather than
+  // each row having its own <img> — same product photo either way, one
+  // fewer image tag per size.
+  const flyFrom = `flyToCart(document.getElementById('variant-modal-img').querySelector('img'), this)`
+
   return c.html(`
-    <div class="img" style="width:64px;height:64px;border-radius:var(--radius-soft);margin:0 auto 10px;font-size:28px">
+    <div class="img" id="variant-modal-img" style="width:64px;height:64px;border-radius:var(--radius-soft);margin:0 auto 10px;font-size:28px">
       ${clicked.imageUrl ? `<img src="${clicked.imageUrl}" alt="${clicked.itemName}">` : '<span aria-hidden="true">🌾</span>'}
     </div>
-    <h3 style="justify-content:center">${clicked.itemName}</h3>
+    <h3 style="text-align:center">${clicked.itemName}</h3>
     <p class="sub" style="text-align:center">Choose a pack size</p>
     <div class="variant-list">
       ${variants
         .map((v) => {
           const outOfStock = v.inStockKg <= 0
+          const sizeKg = v.size ?? 1
           return `
         <form class="variant-row" hx-post="/api/cart/adjust/${v.productId}" hx-target="#cart-count" hx-swap="innerHTML">
-          <input type="hidden" name="delta" value="1">
-          <span class="variant-row__size">${formatSize(v.size ?? 1)}</span>
+          <input type="hidden" name="delta" value="${sizeKg}">
+          <span class="variant-row__size">${formatSize(sizeKg)}</span>
           <span class="variant-row__price">${rupee(v.pricePerKg)}${outOfStock ? ' <small>· Out of stock</small>' : ''}</span>
-          <button type="submit" class="variant-row__add" ${outOfStock ? 'disabled' : ''} aria-label="Add ${formatSize(v.size ?? 1)} to cart">+</button>
+          <button type="submit" class="variant-row__add" ${outOfStock ? 'disabled' : ''} onclick="${outOfStock ? '' : flyFrom + ';toast(\'Added to cart 🛒\')'}" aria-label="Add ${formatSize(sizeKg)} to cart">+</button>
         </form>`
         })
         .join('')}
