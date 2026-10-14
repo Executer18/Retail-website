@@ -1,7 +1,47 @@
-import React, { use } from 'react';
+// src/pages/ProductDetailPage.tsx
+//
+// Route: GET /products/:id
+//
+// Rebuilt as a bottom-sheet popup instead of a standalone page, per your
+// ask. Two exports:
+//   - ProductDetailContent: the actual content, no Layout wrapper. This
+//     is what index.tsx returns for an htmx request (ProductCard's click
+//     hx-gets this route and swaps the result into Layout's
+//     #detail-modal-body — see Layout.tsx's #detailModal).
+//   - ProductDetailPage: ProductDetailContent wrapped in Layout, for a
+//     DIRECT visit to /products/:id (shared link, new tab, no htmx
+//     header on the request) — there's no grid underneath to show a
+//     popup "over", so this degrades to a plain full page rather than
+//     an empty/broken sheet. index.tsx picks between the two based on
+//     the HX-Request header — see the note at the bottom of this file.
+//
+// Changes from the old version, per your ask:
+//   - gallery box uses the OLD stylesheet's containment technique
+//     (fixed aspect-ratio + object-fit:cover) instead of the mockup's
+//     fixed height:300px, so it can't distort regardless of the source
+//     photo's own aspect ratio
+//   - numbered dots (mockup's own .pd-dot is already "1,2,3…" style —
+//     no change needed there, just stopped using the old plain-dot CSS)
+//   - fullscreen viewer ported from the mockup's openViewer/viewerGo,
+//     adapted for real photos (object-fit:contain, not an emoji glyph)
+//   - "Highlights" now reads product.highlights (a real column) instead
+//     of being derived by splitting the description into lines — ADD A
+//     highlights COLUMN TO products IN schema.ts, this won't compile
+//     against your current schema otherwise. Assumed newline-separated
+//     text, same convention the old description-splitting code used.
+//   - Add to Cart moved inline, right after name+price — no more fixed
+//     bottom buy-bar. It's the exact same AddToCartControl ProductCard
+//     uses (imported, not reimplemented), so the stepper, out-of-stock
+//     state, size-variant picker, max-quantity warning, and fly-to-cart
+//     animation are automatically identical to the grid — cart.tsx's
+//     renderCardOob() already keeps both in sync after any change.
+//   - mockup's exact return/exchange and data-privacy copy from
+//     product.html, swapped in for the old page's generic placeholder text
+
 import type { FC } from 'hono/jsx'
 import { Layout } from '../components/Layout'
-import { ProductCard, type ProductCardData } from '../components/ProductCard'
+import { ProductCard, AddToCartControl, type ProductCardData, type ProductVariant } from '../components/ProductCard'
+import { rupee } from '../lib/format'
 
 export type ProductDetail = {
   id: number
@@ -9,29 +49,26 @@ export type ProductDetail = {
   category: string
   pricePerKg: number
   inStockKg: number
+  discountPct: number
   images: string[]
   description?: string | null
+  /** From the new products.highlights column — pre-split into lines by the route, NOT derived from description. */
+  highlights: string[]
   ingredients?: string | null
+  /** This product's own pack-size siblings, for the inline add-to-cart control (SELECT SIZE when length > 1). Always includes this product itself. */
+  variants: ProductVariant[]
 }
 
-const LOW_STOCK_THRESHOLD_KG = 5
-
-export const ProductDetailPage: FC<{
+type ProductDetailProps = {
   product: ProductDetail
   sameCategoryProducts: ProductCardData[]
   otherProducts: ProductCardData[]
-}> = ({ product, sameCategoryProducts, otherProducts }) => {
-  const isOutOfStock = product.inStockKg <= 0
-  const isLowStock = !isOutOfStock && product.inStockKg <= LOW_STOCK_THRESHOLD_KG
-  const images = product.images.length > 0 ? product.images : [null]
+  /** productId -> quantityKg in the session's cart — same map HomePage/ProductsListPage use, needed here for both the main product and the suggestion cards. */
+  cartQuantities: Record<number, number>
+}
 
-  const highlights = product.description
-    ? product.description
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean)
-    : []
-
+export const ProductDetailContent: FC<ProductDetailProps> = ({ product, sameCategoryProducts, otherProducts, cartQuantities }) => {
+  const images = product.images
   const ingredientList = product.ingredients
     ? product.ingredients
         .split(',')
@@ -39,208 +76,146 @@ export const ProductDetailPage: FC<{
         .filter(Boolean)
     : []
 
+  const cardData: ProductCardData = {
+    id: product.id,
+    name: product.name,
+    category: product.category,
+    pricePerKg: product.pricePerKg,
+    inStockKg: product.inStockKg,
+    discountPct: product.discountPct,
+    imageUrl: images[0] ?? null,
+    variants: product.variants,
+  }
+  const currentQtyKg = cartQuantities[product.id] ?? 0
+
   return (
-    <Layout title={product.name} description={product.description || `${product.name} — fresh from Atta Chakki.`}>
-      <div class="product-detail-page">
-        {/* ---------- Top bar: back control ---------- */}
-        <div class="detail-topbar">
-          <a href="/products" class="detail-topbar__back" aria-label="Back to products">
-            &#8592;
-          </a>
-          <a href="/" class="detail-topbar__home" aria-label="Back to home">
-            Home
-          </a>
-        </div>
-
-        <div class="product-detail">
-          {/* ---------- Gallery ---------- */}
-          <div class="gallery">
-            <div class="gallery__scroller" id="gallery-scroller">
-              {images.map((src, i) => (
-                <div class="gallery__slide" data-open-viewer data-index={i}>
-                  {src ? (
-                    <img src={src} alt={`${product.name} photo ${i + 1}`} />
-                  ) : (
-                    <div class="product-card__image-placeholder" style="height: 100%;">
-                      No image
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {images.length > 1 && (
-              <div class="gallery__dots" id="gallery-dots">
-                {images.map((_, i) => (
-                  <span class={`gallery__dot${i === 0 ? ' is-active' : ''}`}></span>
-                ))}
+    <>
+      {/* ---------- Gallery ---------- */}
+      <div class="pd-gallery" id="pd-main-img-wrap">
+        {product.discountPct > 0 && <span class="pd-off">{product.discountPct}% OFF</span>}
+        <div class="pd-track" id="pdTrack">
+          {images.length > 0 ? (
+            images.map((src, i) => (
+              <div class="pd-slide" onclick={`openViewer(${JSON.stringify(images)}, ${i})`}>
+                <img src={src} alt={`${product.name} photo ${i + 1}`} />
               </div>
-            )}
-          </div>
-
-          {/* ---------- Info panel ---------- */}
-          <div>
-            <p class="product-detail__category">{product.category}</p>
-            <h1 class="product-detail__name">{product.name}</h1>
-            <p class="product-detail__price text-price">
-              &#8377;{product.pricePerKg.toFixed(2)}{' '}
-              <span class="text-muted" style="font-size: 0.95rem; font-weight: 400;">
-                /kg
+            ))
+          ) : (
+            <div class="pd-slide" style="display:grid;place-items:center">
+              <span aria-hidden="true" style="font-size:70px">
+                🌾
               </span>
-            </p>
-
-            {isOutOfStock && <p class="stock-note stock-note--out">Out of stock right now</p>}
-            {isLowStock && <p class="stock-note stock-note--low">Only {product.inStockKg}kg left</p>}
-            {!isOutOfStock && !isLowStock && <p class="stock-note stock-note--ok">In stock</p>}
-
-            {/* ---------- Highlights ---------- */}
-            {highlights.length > 0 && (
-              <div class="product-detail__section">
-                <h3>Highlights</h3>
-                <ul class="highlight-list">
-                  {highlights.map((line) => (
-                    <li>{line}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* ---------- Ingredients ---------- */}
-            {ingredientList.length > 0 && (
-              <div class="product-detail__section">
-                <h3>Ingredients</h3>
-                <ul class="pill-list">
-                  {ingredientList.map((item) => (
-                    <li>{item}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* ---------- Full description ---------- */}
-            {product.description && (
-              <div class="product-detail__section">
-                <h3>Product description</h3>
-                <p class="text-muted" style="line-height: 1.6;">
-                  {product.description}
-                </p>
-              </div>
-            )}
-
-            {/* ---------- Static policy sections (fixed copy, edit directly) ---------- */}
-            <div class="product-detail__section">
-              <h3>Return policy</h3>
-              <p class="text-muted" style="line-height: 1.6;">
-                Pickup orders can be exchanged at the counter within 24 hours if the packet is unopened. Ground-to-order
-                atta cannot be returned once collected.
-              </p>
             </div>
-
-            <div class="product-detail__section">
-              <h3>Legal information</h3>
-              <p class="text-muted" style="line-height: 1.6;">
-                Packed and sold in accordance with local food safety regulations. Store in a cool, dry place away from
-                direct sunlight.
-              </p>
-            </div>
-
-            <div class="product-detail__section">
-              <h3>Seller information</h3>
-              <p class="text-muted" style="line-height: 1.6;">
-                Sold by Atta Chakki. For questions about this product, visit the store or use the contact page.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* ---------- Suggestions ---------- */}
-        {sameCategoryProducts.length > 0 && (
-          <div class="suggestions">
-            <div class="section-heading">
-              <h2>More {product.category}</h2>
-            </div>
-            <div class="suggestions__scroller">
-              {sameCategoryProducts.map((p) => (
-                <ProductCard product={p} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {otherProducts.length > 0 && (
-          <div class="suggestions">
-            <div class="section-heading">
-              <h2>You might also like</h2>
-            </div>
-            <div class="suggestions__scroller">
-              {otherProducts.map((p) => (
-                <ProductCard product={p} />
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ---------- Fixed bottom bar: price + qty + add to cart ---------- */}
-      {!isOutOfStock && (
-        <div class="sticky-cart-bar">
-          <div class="qty-stepper" data-qty-stepper data-max={product.inStockKg} data-price-per-kg={product.pricePerKg}>
-            <button type="button" data-qty-decrease disabled>
-              −
-            </button>
-            <span class="qty-stepper__value" data-qty-value>
-              1
-            </span>
-            <button type="button" data-qty-increase>
-              +
-            </button>
-          </div>
-
-          <div class="sticky-cart-bar__price">
-            <span class="sticky-cart-bar__total text-price" data-cart-line-total>
-              &#8377;{product.pricePerKg.toFixed(2)}
-            </span>
-            <span class="text-muted" style="font-size: 0.75rem;">
-              &#8377;{product.pricePerKg.toFixed(2)}/kg
-            </span>
-          </div>
-
-          <button
-            type="button"
-            class="btn "
-            hx-post={`/api/cart/add/${product.id}`}
-            hx-vals="js:{quantityKg: document.querySelector('[data-qty-value]').textContent}"
-            hx-target="#cart-count"
-            hx-swap="innerHTML"
-          >
-            Add to cart
-          </button>
-        </div>
-      )}
-
-      {isOutOfStock && (
-        <div class="sticky-cart-bar sticky-cart-bar--disabled">
-          <span class="text-muted">Currently out of stock</span>
-        </div>
-      )}
-
-      {/* ---------- Fullscreen image viewer ---------- */}
-      <div class="image-viewer" id="image-viewer">
-        <button type="button" class="image-viewer__close" id="image-viewer-close" aria-label="Close">
-          &#10005;
-        </button>
-        <div class="image-viewer__scroller" id="image-viewer-scroller">
-          {images.map((src, i) =>
-            src ? (
-              <div class="image-viewer__slide">
-                <img src={src} alt={`${product.name} photo ${i + 1}, full view`} />
-              </div>
-            ) : null
           )}
         </div>
+        {images.length > 1 && (
+          <div class="pd-dots">
+            {images.map((_, i) => (
+              <button type="button" class={`pd-dot${i === 0 ? ' on' : ''}`} onclick={`pdGo(${i})`}>
+                {i + 1}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      <script src="/product-detail.js"></script>
+      {/* ---------- Info ---------- */}
+      <div class="pd-info">
+        <p class="pd-meta">{product.category}</p>
+        <h1>{product.name}</h1>
+        <div class="pd-price">
+          <b>{rupee(product.pricePerKg)}</b>
+          {product.discountPct > 0 && (
+            <>
+              <s>{rupee(product.pricePerKg / (1 - product.discountPct / 100))}</s>
+              <span class="save">{product.discountPct}% OFF</span>
+            </>
+          )}
+        </div>
+
+        {/* Add to cart — right after name+price, not a fixed buy-bar.
+            Same control the grid card uses; flyOriginExpr points at the
+            gallery above instead of a .pcard ancestor since there isn't
+            one here. */}
+        <AddToCartControl product={cardData} currentQtyKg={currentQtyKg} flyOriginExpr="document.getElementById('pd-main-img-wrap')" />
+
+        {product.highlights.length > 0 && (
+          <div class="pd-block">
+            <h4>Highlights</h4>
+            <ul>
+              {product.highlights.map((line) => (
+                <li>{line}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {ingredientList.length > 0 && (
+          <div class="pd-block">
+            <h4>Ingredients</h4>
+            <div class="ingchips">
+              {ingredientList.map((item) => (
+                <span>{item}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {product.description && (
+          <div class="pd-block">
+            <h4>Description</h4>
+            <p>{product.description}</p>
+          </div>
+        )}
+
+        <div class="pd-block">
+          <h4>Return & Exchange</h4>
+          <p>
+            Since every batch is ground fresh to order, we accept return or exchange within <b>2 days of pickup</b> only
+            for sealed, unopened packs with the batch slip. Opened flour cannot be restocked for hygiene reasons — but if
+            there's a quality issue, bring it back and we'll regrind or replace it free.
+          </p>
+        </div>
+      </div>
+
+      <p class="pd-fine">
+        🔒 Your data stays yours — we collect only your name and phone number to manage pickup orders. We never sell or
+        share personal information. Payment details (when online payment is enabled) are processed end-to-end by
+        Razorpay; we never see or store card numbers.
+      </p>
+
+      {/* ---------- Suggestions ---------- */}
+      {sameCategoryProducts.length > 0 && (
+        <div class="pd-suggest">
+          <h4>More {product.category}</h4>
+          <div class="pd-suggest-row">
+            {sameCategoryProducts.map((p) => (
+              <ProductCard product={p} currentQtyKg={cartQuantities[p.id] ?? 0} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {otherProducts.length > 0 && (
+        <div class="pd-suggest">
+          <h4>You might also like</h4>
+          <div class="pd-suggest-row">
+            {otherProducts.map((p) => (
+              <ProductCard product={p} currentQtyKg={cartQuantities[p.id] ?? 0} />
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+// Direct-visit fallback (no HX-Request header — see index.tsx). There's
+// no grid loaded underneath to pop up over, so this is a plain page.
+export const ProductDetailPage: FC<ProductDetailProps> = (props) => {
+  return (
+    <Layout title={props.product.name} description={props.product.description || `${props.product.name} — fresh, stone-ground.`} active="product" header="search">
+      <ProductDetailContent {...props} />
     </Layout>
   )
 }

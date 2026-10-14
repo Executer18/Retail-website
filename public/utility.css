@@ -1366,22 +1366,255 @@ h1,h2,h3,h4{color:var(--color-ink)}
 
 
 
-.offline-banner {
-  position: fixed;
-  top: 0;
+
+
+
+/* ==========================================================================
+   Home / ProductCard integration additions — NOT part of the original
+   mockup. Append this to the end of styles.css, after
+   cart-ui-additions.css.
+   ========================================================================== */
+
+/* Real product image inside .pcard .img — same box size as the mockup
+   (92px tall, full card width), clipped so it can't overflow. */
+.pcard .img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.pcard.out-of-stock {
+  opacity: 0.55;
+}
+.pcard.out-of-stock .img img,
+.pcard.out-of-stock .img span {
+  filter: grayscale(0.6);
+}
+
+/* "+N" size-variant badge next to the weight line. */
+.size-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+  font-size: 9.5px;
+  font-weight: 800;
+  vertical-align: middle;
+}
+
+/* "What would you like to do?" — 3 cards, horizontally scrollable
+   instead of the mockup's fixed 2-column grid. */
+.cta-row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+.cta-row::-webkit-scrollbar {
+  display: none;
+}
+.cta-row .cta-big {
+  flex: none;
+  width: 72%;
+  max-width: 230px;
+  scroll-snap-align: start;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+.cta-c {
+  background: linear-gradient(135deg, var(--color-success), #1f6a46);
+}
+@media (min-width: 560px) {
+  .cta-row .cta-big {
+    width: 31%;
+  }
+}
+
+/* Real-photo hero slides — the mockup's .slide .bg was a flat CSS
+   gradient; this fills it with a photo instead. Just a short scrim at
+   the bottom so the kicker/title/sub text stays readable — not a full
+   dark wash over the whole photo, and the mockup's big rotating .deco
+   emoji is dropped for these slides entirely (it's meant to sit on a
+   flat color block; over an actual photo it just looks like something
+   broken floating on top). HomePage.tsx doesn't render .deco in the
+   hero anymore for this reason. */
+.slide .bg {
+  background: var(--color-ink);
+}
+.slide .bg img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.slide .bg::after {
+  content: '';
+  position: absolute;
   left: 0;
   right: 0;
-  z-index: 300;
-  background: var(--color-ink);
-  color: #fff;
-  text-align: center;
-  font-size: 12.5px;
-  font-weight: 700;
-  padding: 8px;
-  padding-top: calc(8px + env(safe-area-inset-top, 0px));
-  transform: translateY(-100%);
-  transition: transform 0.3s;
+  bottom: 0;
+  height: 55%;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
 }
-.offline-banner.show {
-  transform: translateY(0);
+
+/* Size-variant picker rows (products.ts' /api/products/:id/variants),
+   shown inside Layout's shared #variantModal. */
+.variant-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.variant-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-soft);
+}
+.variant-row__size {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--color-ink);
+  flex: 1;
+}
+.variant-row__price {
+  font-size: 12.5px;
+  color: var(--color-muted);
+}
+.variant-row__price small {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+.variant-row__add {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+}
+.variant-row__add:disabled {
+  background: var(--color-border);
+  color: var(--color-muted);
+  pointer-events: none;
+}
+
+/* ---------- Responsiveness pass ----------
+   The mockup is already mobile-first; these widen things gracefully on
+   larger screens instead of letting the single mobile column stretch
+   edge-to-edge. */
+@media (min-width: 720px) {
+  body {
+    max-width: 640px;
+    margin: 0 auto;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.05);
+  }
+  .bottomnav,
+  .floatcart {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 640px;
+  }
+  .floatcart.show {
+    /* base rule's .show transform (translateY) would otherwise clobber
+       the centering transform above */
+    transform: translateX(-50%) translateY(0);
+  }
+}
+@media (max-width: 360px) {
+  .catgrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .cta-row .cta-big {
+    width: 84%;
+  }
+}
+
+
+
+/* ==========================================================================
+   Product detail popup additions — NOT part of the original mockup
+   (which was a full page, not a bottom sheet, and used emoji glyphs
+   instead of real photos everywhere below). Append to utility.css.
+   ========================================================================== */
+
+/* The detail popup itself: fixed at 80% of viewport height (not just a
+   max-height cap) so the top 20% always shows the page behind it. */
+.modal.sheet-80 {
+  height: 80vh;
+  max-height: 80vh;
+}
+
+/* Gallery: adopts the OLD stylesheet's containment technique (fixed
+   aspect-ratio + object-fit:cover) instead of the mockup's fixed
+   height:300px — a square box that never distorts regardless of the
+   source photo's own aspect ratio. Numbered .pd-dot styling is already
+   in utility.css and needs no changes. */
+.pd-slide {
+  height: auto;
+  aspect-ratio: 1 / 1;
+  font-size: 0; /* was sized for a centered emoji glyph; no longer needed */
+}
+.pd-slide img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Fullscreen viewer: real <img>, contain (not cover) so the whole photo
+   is visible when zoomed in, not cropped. */
+.v-img {
+  width: min(72vw, 340px);
+  height: min(72vw, 340px);
+  border-radius: var(--radius-soft);
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: vIn 0.3s cubic-bezier(0.34, 1.4, 0.5, 1);
+  background: rgba(255, 255, 255, 0.04);
+}
+.v-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* "More in this category" / "You might also like" — a horizontal row of
+   the same .pcard used on the grid, just scrollable instead of wrapping. */
+.pd-suggest {
+  margin: 20px 0 4px;
+}
+.pd-suggest h4 {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-ink);
+  margin-bottom: 10px;
+  padding: 0 14px;
+}
+.pd-suggest-row {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 0 14px 4px;
+  scrollbar-width: none;
+}
+.pd-suggest-row::-webkit-scrollbar {
+  display: none;
+}
+.pd-suggest-row .pcard {
+  flex: none;
+  width: 140px;
 }

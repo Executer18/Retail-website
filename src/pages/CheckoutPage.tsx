@@ -35,6 +35,25 @@ const CHECKOUT_JS = `
   var grid = document.getElementById('ck-slots');
   var btn = document.getElementById('ck-place-btn');
   var toastEl = null, toastT;
+  var methodEls = form.querySelectorAll('input[name="paymentMethod"]');
+
+  function isOnline() {
+    for (var i = 0; i < methodEls.length; i++) {
+      if (methodEls[i].checked) return methodEls[i].value === 'online';
+    }
+    return false;
+  }
+
+  // "Place Pickup Order" for counter, "Pay ₹X Online" for online
+  function idleLabel() {
+    return btn.getAttribute(isOnline() ? 'data-online-text' : 'data-counter-text') || 'Place Pickup Order';
+  }
+
+  for (var m = 0; m < methodEls.length; m++) {
+    methodEls[m].addEventListener('change', function () {
+      if (!btn.disabled) btn.textContent = idleLabel();
+    });
+  }
 
   function toast(msg) {
     if (!toastEl) {
@@ -102,13 +121,13 @@ const CHECKOUT_JS = `
 
     nameEl.value = name;
     btn.disabled = true;
-    btn.textContent = 'Placing order…';
+    btn.textContent = isOnline() ? 'Starting payment…' : 'Placing order…';
   });
 
   // Back button (bfcache) should not leave the button stuck on "Placing order…"
   window.addEventListener('pageshow', function () {
     btn.disabled = !grid;
-    btn.textContent = 'Place Pickup Order';
+    btn.textContent = idleLabel();
   });
 })();
 `
@@ -117,7 +136,8 @@ export const CheckoutPage: FC<{
   items: CheckoutItem[]
   totals: CheckoutTotals
   slots: PickupSlot[]
-}> = ({ items, totals, slots }) => {
+  onlineEnabled?: boolean // false when Razorpay keys aren't configured -> only "pay at counter" is offered
+}> = ({ items, totals, slots, onlineEnabled = false }) => {
   const pickupDay = slots.length > 0 ? splitLabel(slots[0].label).day : ''
 
   return (
@@ -221,6 +241,34 @@ export const CheckoutPage: FC<{
           )}
         </div>
 
+        {/* Payment method — counter is the default */}
+        {onlineEnabled && (
+          <div class="ck-sec">
+            <h4>💳 Payment Method</h4>
+            <label class="ck-payopt">
+              <input type="radio" name="paymentMethod" value="counter" checked />
+              <span class="ck-payopt__box">
+                <span class="ck-payopt__dot"></span>
+                <span class="ck-payopt__txt">
+                  <b>Pay at counter</b>
+                  <small>Pay when you collect your order</small>
+                </span>
+              </span>
+            </label>
+            <label class="ck-payopt">
+              <input type="radio" name="paymentMethod" value="online" />
+              <span class="ck-payopt__box">
+                <span class="ck-payopt__dot"></span>
+                <span class="ck-payopt__txt">
+                  <b>Pay online</b>
+                  <small>UPI, cards &amp; net banking via Razorpay</small>
+                </span>
+                <span class="ck-payopt__tag">Test mode</span>
+              </span>
+            </label>
+          </div>
+        )}
+
         {/* Store location */}
         <div class="ck-sec">
           <h4>📍 Pickup Location</h4>
@@ -246,7 +294,13 @@ export const CheckoutPage: FC<{
         </div>
 
         <div class="ck-place">
-          <button type="submit" id="ck-place-btn" disabled={slots.length === 0}>
+          <button
+            type="submit"
+            id="ck-place-btn"
+            disabled={slots.length === 0}
+            data-counter-text="Place Pickup Order"
+            data-online-text={`Pay ${rupee(totals.pay)} Online`}
+          >
             Place Pickup Order
           </button>
         </div>

@@ -27,18 +27,25 @@ import { cartItems, products } from '../db/schema'
 import type { Env, Variables } from '../db'
 import { CartContents, rupee, type CartRow } from '../pages/fragments/CartContents'
 import { CartPage } from '../pages/CartPage'
-import { ProductCard } from '../components/ProductCard'
+import { ProductCard, AddToCartControl } from '../components/ProductCard'
 import { groupBySizeVariants } from '../lib/product-variants'
 
 export const cartRoutes = new Hono<{ Bindings: Env; Variables: Variables }>()
 
+// Exported for HomePage/ProductsListPage: without this, every full page
+// load renders every ProductCard with currentQtyKg defaulting to 0, so
+// a refresh always shows "ADD" even for items already in the cart. Call
+// this alongside your products query and look up cartQuantities[productId]
+// per card.
+export async function getCartQuantities(db: ReturnType<typeof getDB>, sessionId: string): Promise<Record<number, number>> {
+  const rows = await db
+    .select({ productId: cartItems.productId, quantityKg: cartItems.quantityKg })
+    .from(cartItems)
+    .where(eq(cartItems.sessionId, sessionId))
 
-
-function cartTrigger(warningMessage?: string) {
-  return JSON.stringify({
-    'cart-updated': true,
-    ...(warningMessage ? { 'cart-warning': { message: warningMessage } } : {}),
-  })
+  const map: Record<number, number> = {}
+  for (const row of rows) map[row.productId] = row.quantityKg
+  return map
 }
 
 async function loadCartWithProducts(db: ReturnType<typeof getDB>, sessionId: string) {
@@ -88,18 +95,24 @@ async function loadCartWithProducts(db: ReturnType<typeof getDB>, sessionId: str
   return { items, total, totalMrp, totalSavings }
 }
 
-export async function getCartQuantities(db: ReturnType<typeof getDB>, sessionId: string): Promise<Record<number, number>> {
-  const rows = await db
-    .select({ productId: cartItems.productId, quantityKg: cartItems.quantityKg })
-    .from(cartItems)
-    .where(eq(cartItems.sessionId, sessionId))
-
-  const map: Record<number, number> = {}
-  for (const row of rows) map[row.productId] = row.quantityKg
-  return map
+// Builds the HX-Trigger header value every cart-mutating route sends.
+// Always fires "cart-updated" (the header badge/floating button/cart
+// modal all listen for it). When a stock clamp happened, also fires
+// "cart-warning" with a message — Layout.tsx's global listener turns
+// that into a toast(), so the "only Xkg available" message shows up on
+// every page, not just inside the cart popup.
+function cartTrigger(warningMessage?: string) {
+  return JSON.stringify({
+    'cart-updated': true,
+    ...(warningMessage ? { 'cart-warning': { message: warningMessage } } : {}),
+  })
 }
 
-
+// Shared by /api/cart/adjust, /update and /remove: rebuilds whichever
+// card the change affects as an out-of-band swap (id={`pcard-${id}`}).
+// Without this, only the adjust route kept a ProductCard in sync — the
+// cart page/modal's own update+remove routes left the grid showing
+// stale ADD/stepper state until a full reload.
 async function renderCardOob(db: ReturnType<typeof getDB>, productId: number, nextQty: number) {
   const [product] = await db.select().from(products).where(eq(products.productId, productId))
   if (!product) return null
@@ -117,11 +130,25 @@ async function renderCardOob(db: ReturnType<typeof getDB>, productId: number, ne
     discountPct: clickedVariant.discountPct,
   }
 
-  return <ProductCard product={cardForClicked} currentQtyKg={nextQty} oob />
+  // Two independent OOB targets, not one: id="pcard-{id}" matches a grid
+  // card if one's on the page, id="addrow-{id}" matches ProductDetailPage's
+  // standalone inline control if THAT's on the page instead (or as well —
+  // the grid can sit behind an open detail sheet). Whichever doesn't
+  // exist on the current page is just a no-op swap, same as before.
+  return (
+    <>
+      <ProductCard product={cardForClicked} currentQtyKg={nextQty} oob />
+      <AddToCartControl
+        product={cardForClicked}
+        currentQtyKg={nextQty}
+        oob
+        flyOriginExpr="document.getElementById('pd-main-img-wrap')"
+      />
+    </>
+  )
 }
 
 // ---------- Add to cart ----------
-
 cartRoutes.post('/api/cart/add/:productId', async (c) => {
   const db = getDB(c.env)
   const sessionId = c.get('sessionId')
@@ -159,10 +186,7 @@ cartRoutes.post('/api/cart/add/:productId', async (c) => {
     ? `<span id="cart-add-feedback" hx-swap-oob="true" class="cart-add-feedback cart-add-feedback--visible">Only ${product.inStockKg}kg available — added the maximum.</span>`
     : `<span id="cart-add-feedback" hx-swap-oob="true" class="cart-add-feedback"></span>`
 
-  c.header('HX-Trigger', cartTrigger(wasClamped ? `Only ${product.inStockKg}kg available added the maximum.` : undefined))
-
-
-  
+  c.header('HX-Trigger', cartTrigger(wasClamped ? `Only ${product.inStockKg}kg available — added the maximum.` : undefined))
   return c.html(`${itemCount}${warningHtml}`)
 })
 
@@ -215,27 +239,11 @@ cartRoutes.post('/api/cart/adjust/:productId', async (c) => {
     await db.insert(cartItems).values({ sessionId, productId, quantityKg: nextQty })
   }
 
-  // Rebuild the card around the SPECIFIC variant that was just adjusted
-  // (not whichever sibling groupBySizeVariants would otherwise default
-  // to), so the stepper reflects the exact size the shopper tapped.
-  const siblings = await db.select().from(products).where(eq(products.itemName, product.itemName))
-  const [family] = groupBySizeVariants(siblings)
-  const clickedVariant = family?.variants.find((v) => v.id === productId)
-  const cardForClicked =
-    family && clickedVariant
-      ? {
-          ...family,
-          id: clickedVariant.id,
-          pricePerKg: clickedVariant.pricePerKg,
-          inStockKg: clickedVariant.inStockKg,
-          discountPct: clickedVariant.discountPct,
-        }
-      : null
-
+  const cardOob = await renderCardOob(db, productId, nextQty)
   const { items } = await loadCartWithProducts(db, sessionId)
   const itemCount = items.length
 
-  c.header('HX-Trigger', cartTrigger(wasClamped ? `Only ${product.inStockKg}kg available added the maximum.` : undefined))
+  c.header('HX-Trigger', cartTrigger(wasClamped ? `Only ${product.inStockKg}kg available — added the maximum.` : undefined))
   return c.html(
     <>
       {itemCount}
@@ -246,7 +254,7 @@ cartRoutes.post('/api/cart/adjust/:productId', async (c) => {
       >
         {wasClamped ? `Only ${product.inStockKg}kg available — added the maximum.` : ''}
       </span>
-      {cardForClicked && <ProductCard product={cardForClicked} currentQtyKg={nextQty} oob />}
+      {cardOob}
     </>
   )
 })
@@ -297,6 +305,9 @@ cartRoutes.post('/api/cart/update/:cartItemId', async (c) => {
   let clampedTo: number | null = null
   let cardOob = null
 
+  // Looked up unconditionally now (used to be only inside the >0 branch)
+  // so the OOB card refresh below also fires when a line gets deleted
+  // (requestedKg <= 0) — that path used to leave the grid card stale too.
   const [row] = await db
     .select({ productId: cartItems.productId })
     .from(cartItems)
@@ -327,7 +338,7 @@ cartRoutes.post('/api/cart/update/:cartItemId', async (c) => {
         )
       : items
 
-    c.header('HX-Trigger', cartTrigger(clampedTo !== null ? `Only ${clampedTo}kg available adjusted.` : undefined))
+  c.header('HX-Trigger', cartTrigger(clampedTo !== null ? `Only ${clampedTo}kg available — adjusted.` : undefined))
   return c.html(
     <>
       <CartContents items={withWarning} total={total} totalMrp={totalMrp} totalSavings={totalSavings} />
@@ -342,7 +353,7 @@ cartRoutes.post('/api/cart/remove/:cartItemId', async (c) => {
   const sessionId = c.get('sessionId')
   const cartItemId = parseInt(c.req.param('cartItemId'), 10)
 
-    const [row] = await db
+  const [row] = await db
     .select({ productId: cartItems.productId })
     .from(cartItems)
     .where(and(eq(cartItems.cartItemId, cartItemId), eq(cartItems.sessionId, sessionId)))
@@ -358,8 +369,6 @@ cartRoutes.post('/api/cart/remove/:cartItemId', async (c) => {
       {cardOob}
     </>
   )
-
-
 })
 
 // ---------- Cart page (direct /cart visit — the modal is the primary path now) ----------

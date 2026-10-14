@@ -42,6 +42,7 @@ export const products = sqliteTable(
     ingredients: text("ingredients"),
     discount: integer("product_discount"),
     size: real("size_variants"),
+    highlights: text("highlights"),
   },
   (t) => [
     index("idx_products_category").on(t.category),
@@ -111,10 +112,17 @@ export const orders = sqliteTable(
     totalAmount: real("total_amount").notNull(),
     customerName: text("customer_name").notNull(),
     customerPhone: text("customer_phone").notNull(),
+  
+paymentMethod: text("payment_method", { enum: ["counter", "online"] }).notNull().default("counter"),
+paymentStatus: text("payment_status", { enum: ["unpaid", "paid"] }).notNull().default("unpaid"),
+razorpayOrderId: text("razorpay_order_id"),
+razorpayPaymentId: text("razorpay_payment_id"),
+cartSessionId: text("cart_session_id"), // which cart an online order came from, so it can be cleared once paid
   },
   (t) => [
     index("idx_orders_status").on(t.status),
     index("idx_orders_customer_id").on(t.customerId),
+    uniqueIndex("uq_orders_razorpay_order_id").on(t.razorpayOrderId),
   ]
 );
 

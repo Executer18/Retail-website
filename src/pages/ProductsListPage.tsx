@@ -1,95 +1,106 @@
-// pages/ProductsListPage.tsx
+// src/pages/ProductsListPage.tsx
 //
 // Route: GET /products
 // Route: GET /products?category=Atta
 // Route: GET /products?q=besan
-// Route: GET /products?category=Atta&q=besan   (both together)
+// Route: GET /products?category=Atta&q=besan
 //
-// Rebuilt per feedback: real search bar (was completely missing before),
-// and a denser Amazon-Now-style grid. Category filter stays a HORIZONTAL
-// chip bar, not a sidebar — you explicitly said to skip the sidebar, and a
-// sidebar also doesn't fit a single-column mobile layout anyway, which is
-// the primary device for this store's customers.
+// Rebuilt to match the mockup's products.html: a horizontal filter chip
+// bar (styles.css's .filterbar/.fchip — not the old .category-bar/
+// .category-chip), the same result-note copy, and the real prodgrid with
+// a "clear filter" button when a filter is active. Search bar markup is
+// unchanged (was already real, just restyled to match).
 //
-// `q` is read server-side in the route handler (plain LIKE match against
-// item_name) and passed back here just to keep the search input filled in
-// and to drive the empty-state message — this file does no filtering
-// itself.
+// Cards now come pre-grouped into size families and pre-sorted
+// out-of-stock-last — see the index.tsx note at the bottom of this file.
+// cartQuantities is the same productId -> quantityKg map HomePage uses,
+// so a card here shows the exact same ADD/stepper state as everywhere
+// else, no separate logic.
 
 import type { FC } from 'hono/jsx'
 import { Layout } from '../components/Layout'
 import { ProductCard, type ProductCardData } from '../components/ProductCard'
+import { categoryIcon } from '../lib/category-icons'
 
 export const ProductsListPage: FC<{
   products: ProductCardData[]
   categories: string[]
   activeCategory: string | null
   searchQuery: string | null
-}> = ({ products, categories, activeCategory, searchQuery }) => {
-  return (
-    <Layout title="Products" description="Browse our full range of flours, grains, and more.">
-      <form action="/products" method="get" class="search-bar">
-        <svg class="search-bar__icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-          <path
-            fill="currentColor"
-            d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"
-          />
-        </svg>
-        <input
-          type="text"
-          name="q"
-          value={searchQuery || ''}
-          placeholder="Search for atta, besan, sooji..."
-          class="search-bar__input"
-          aria-label="Search products"
-        />
-        {activeCategory && <input type="hidden" name="category" value={activeCategory} />}
-      </form>
+  cartQuantities: Record<number, number>
+}> = ({ products, categories, activeCategory, searchQuery, cartQuantities }) => {
+  const isFiltered = Boolean(activeCategory || searchQuery)
 
-      <div class="category-bar">
+  return (
+    <Layout title="Products" description="Browse our full range of flours, grains, and more." active="product" header="search">
+      <div class="filterbar">
         <a
           href={searchQuery ? `/products?q=${encodeURIComponent(searchQuery)}` : '/products'}
-          class={`category-chip${!activeCategory ? ' is-active' : ''}`}
+          class={`fchip${!activeCategory ? ' on' : ''}`}
         >
-          All
+          ✨ All
         </a>
         {categories.map((category) => {
           const params = new URLSearchParams()
           params.set('category', category)
           if (searchQuery) params.set('q', searchQuery)
           return (
-            <a href={`/products?${params.toString()}`} class={`category-chip${activeCategory === category ? ' is-active' : ''}`}>
-              {category}
+            <a href={`/products?${params.toString()}`} class={`fchip${activeCategory === category ? ' on' : ''}`}>
+              {categoryIcon(category)} {category}
             </a>
           )
         })}
       </div>
 
-      <div class="section-heading">
-        <h1 style="font-size: 1.3rem; margin: 0;">
-          {searchQuery ? `Results for "${searchQuery}"` : activeCategory || 'All products'}
-        </h1>
-        <span class="text-muted" style="font-size: 0.85rem;">
-          {products.length} item{products.length === 1 ? '' : 's'}
-        </span>
-      </div>
+      <p class="result-note">
+        {searchQuery ? (
+          <>
+            Showing <b>{products.length}</b> result{products.length !== 1 ? 's' : ''}
+            {activeCategory ? (
+              <>
+                {' '}
+                in <b>{activeCategory}</b>
+              </>
+            ) : null}{' '}
+            for "<b>{searchQuery}</b>"
+          </>
+        ) : activeCategory ? (
+          <>
+            Showing <b>{products.length}</b> result{products.length !== 1 ? 's' : ''} in <b>{activeCategory}</b>
+          </>
+        ) : (
+          <>
+            Showing all <b>{products.length}</b> products — stone-ground fresh
+          </>
+        )}
+      </p>
 
       {products.length > 0 ? (
-        <div class="grid-cards grid-cards--dense">
+        <div class="prodgrid">
           {products.map((product) => (
-            <ProductCard product={product} />
+            <ProductCard product={product} currentQtyKg={cartQuantities[product.id] ?? 0} />
           ))}
+          {isFiltered && (
+            <div class="clear-wrap">
+              <a href="/products" class="clear-big">
+                ✕ Clear filter · Show all products
+              </a>
+            </div>
+          )}
         </div>
       ) : (
-        <div class="empty-state">
-          <p>
-            {searchQuery
-              ? `No products match "${searchQuery}".`
-              : activeCategory
-                ? `No products in "${activeCategory}" right now.`
-                : 'No products added yet. Check back soon.'}
-          </p>
-        </div>
+        <>
+          <div class="empty">
+            <div class="em">🔍</div>
+            <b>No matches found</b>
+            <p style="font-size:12px;margin-top:4px">Try a different search or clear the filter.</p>
+          </div>
+          <div class="clear-wrap">
+            <a href="/products" class="clear-big">
+              ✕ Clear filter
+            </a>
+          </div>
+        </>
       )}
     </Layout>
   )

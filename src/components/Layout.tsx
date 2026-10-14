@@ -17,6 +17,7 @@ import type { FC, PropsWithChildren } from 'hono/jsx'
 import { raw } from 'hono/html'
 import { getContext } from 'hono/context-storage'
 
+
 type NavKey = 'home' | 'product' | 'search' | 'account' | 'contact'
 
 type LayoutProps = PropsWithChildren<{
@@ -122,6 +123,62 @@ const LAYOUT_SCRIPT = `
     setTimeout(function(){ ghost.remove(); }, 720);
   }
 
+  // Product-detail gallery: numbered dots + swipe. Delegated (not bound
+  // directly to #pdTrack) since the gallery is usually injected later via
+  // htmx into #detail-modal-body, not present when this script first runs.
+  function pdGo(i){
+    var track = document.getElementById('pdTrack');
+    if (!track) return;
+    var dots = track.parentElement.querySelectorAll('.pd-dot');
+    track.style.transform = 'translateX(-' + (i * 100) + '%)';
+    dots.forEach(function(d, j){ d.classList.toggle('on', j === i); });
+  }
+  var pdSwipeStartX = null;
+  document.body.addEventListener('touchstart', function(e){
+    if (e.target.closest('.pd-track')) pdSwipeStartX = e.touches[0].clientX;
+  }, { passive: true });
+  document.body.addEventListener('touchend', function(e){
+    if (pdSwipeStartX === null) return;
+    var track = e.target.closest('.pd-track');
+    if (!track) { pdSwipeStartX = null; return; }
+    var dx = e.changedTouches[0].clientX - pdSwipeStartX;
+    pdSwipeStartX = null;
+    if (Math.abs(dx) < 40) return;
+    var dots = track.parentElement.querySelectorAll('.pd-dot');
+    var slideCount = track.querySelectorAll('.pd-slide').length;
+    var activeIdx = 0;
+    dots.forEach(function(d, j){ if (d.classList.contains('on')) activeIdx = j; });
+    pdGo(Math.max(0, Math.min(slideCount - 1, activeIdx + (dx < 0 ? 1 : -1))));
+  }, { passive: true });
+
+  // Fullscreen image viewer (ProductDetailPage's gallery). Ported from
+  // the mockup's app.js — only real change is renderViewer() injecting a
+  // real <img> instead of setting an emoji + background-color pair.
+  var vImgs = [], vIdx = 0;
+  function openViewer(imgs, i){
+    vImgs = imgs; vIdx = i || 0;
+    renderViewer();
+    document.getElementById('viewer').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeViewer(){
+    document.getElementById('viewer').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  function viewerGo(d){ vIdx = (vIdx + d + vImgs.length) % vImgs.length; renderViewer(); }
+  function renderViewer(){
+    var src = vImgs[vIdx];
+    document.getElementById('vImg').innerHTML = src ? '<img src="' + src + '" alt="">' : '';
+    document.getElementById('vCount').textContent = (vIdx + 1) + ' / ' + vImgs.length;
+  }
+  document.addEventListener('keydown', function(e){
+    var v = document.getElementById('viewer');
+    if (!v || !v.classList.contains('open')) return;
+    if (e.key === 'Escape') closeViewer();
+    if (e.key === 'ArrowLeft') viewerGo(-1);
+    if (e.key === 'ArrowRight') viewerGo(1);
+  });
+
   // After a successful add from inside the size-variant modal, close it
   // so the shopper sees the toast/fly animation land rather than
   // staring at the picker.
@@ -139,19 +196,78 @@ const LAYOUT_SCRIPT = `
 });
 
 // offline no internet connection
-function setOfflineBanner(isOffline){
-  var el = document.getElementById('offline-banner');
-  if (el) el.classList.toggle('show', isOffline);
-}
-window.addEventListener('offline', function(){ setOfflineBanner(true); });
-window.addEventListener('online', function(){ setOfflineBanner(false); toast('Back online ✅'); });
-if (!navigator.onLine) setOfflineBanner(true);
+// offline / online banner (self-contained: injects its own CSS)
+var netBanner, netIcon, netText, netTimer;
 
-// Fires when an htmx request never reaches the server at all — the
-// exact "button click does nothing" case.
-document.body.addEventListener('htmx:sendError', function(){
-  toast('No internet connection — please try again');
+(function(){
+  if (document.getElementById('net-banner-style')) return;
+  var s = document.createElement('style');
+  s.id = 'net-banner-style';
+  s.textContent = [
+    '.net-banner{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:9999;display:flex;align-items:center;gap:8px;max-width:calc(100% - 24px);padding:10px 16px;border-radius:999px;font-size:13px;font-weight:600;line-height:1.2;color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.25);pointer-events:none;opacity:0;visibility:hidden;transform:translate(-50%,24px);transition:transform .3s ease,opacity .3s ease,visibility 0s linear .3s}',
+    '.net-banner.show{opacity:1;visibility:visible;transform:translate(-50%,0);transition-delay:0s}',
+    '.net-banner.offline{background:linear-gradient(135deg,#ef4444,#b91c1c)}',
+    '.net-banner.online{background:linear-gradient(135deg,#22c55e,#15803d)}',
+    '.net-banner__icon{display:inline-flex;width:18px;height:18px;flex:0 0 18px}',
+    '.net-banner__icon svg{width:18px;height:18px;display:block}',
+    '.net-banner.offline .net-banner__icon{animation:net-pulse 1.4s ease-in-out infinite}',
+    '@keyframes net-pulse{0%,100%{opacity:1}50%{opacity:.4}}',
+    '@media (prefers-reduced-motion:reduce){.net-banner,.net-banner.offline .net-banner__icon{transition:none;animation:none}}'
+  ].join('');
+  document.head.appendChild(s);
+})();
+
+var NET_ICONS = {
+  offline: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="2" x2="22" y2="22"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><path d="M5 12.9a10 10 0 0 1 5.2-2.7"/><path d="M19 12.9a10 10 0 0 0-2.1-1.6"/><path d="M2 8.8a15 15 0 0 1 4.2-2.6"/><path d="M22 8.8a15 15 0 0 0-8.3-3.7"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>',
+  online: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.9a10 10 0 0 1 14 0"/><path d="M2 8.8a15 15 0 0 1 20 0"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>'
+};
+
+function getNetBanner(){
+  if (netBanner) return netBanner;
+  netBanner = document.createElement('div');
+  netBanner.className = 'net-banner';
+  netBanner.setAttribute('role', 'status');
+  netBanner.setAttribute('aria-live', 'polite');
+  netIcon = document.createElement('span');
+  netIcon.className = 'net-banner__icon';
+  netText = document.createElement('span');
+  netBanner.appendChild(netIcon);
+  netBanner.appendChild(netText);
+  document.body.appendChild(netBanner);
+  return netBanner;
+}
+
+function showNetBanner(state, message, autoHideMs){
+  var el = getNetBanner();
+  clearTimeout(netTimer);
+  netIcon.innerHTML = NET_ICONS[state];
+  netText.textContent = message;
+  el.className = 'net-banner ' + state;
+  void el.offsetWidth;
+  el.classList.add('show');
+  if (autoHideMs) netTimer = setTimeout(hideNetBanner, autoHideMs);
+}
+
+function hideNetBanner(){
+  if (netBanner) netBanner.classList.remove('show');
+}
+
+window.addEventListener('offline', function(){
+  showNetBanner('offline', 'No internet connection');
 });
+window.addEventListener('online', function(){
+  showNetBanner('online', 'Back online', 2500);
+});
+if (!navigator.onLine) showNetBanner('offline', 'No internet connection');
+
+document.body.addEventListener('htmx:sendError', function(){
+  if (!navigator.onLine) return;
+  showNetBanner('offline', 'Connection problem. Please try again', 3500);
+});
+
+
+
+
 
 
   // Shared toast (used by the grinding/sell-to-store calculators on the
@@ -195,11 +311,16 @@ export const Layout: FC<LayoutProps> = ({
 }) => {
   const hasInitialCount = typeof initialCartCount === 'number' && initialCartCount > 0
 
+
+   
 // 1. Fetch the Hono context automatically out of thin air
   const c = getContext()
   
   // 2. Check if the user is on the checkout page (fallback safely if c is undefined)
-  const isCheckout = c?.req?.path === '/checkout'
+  const isCheckout = c?.req?.path?.startsWith('/checkout');
+
+
+
   
   return (
     <html lang="en">
@@ -216,13 +337,20 @@ export const Layout: FC<LayoutProps> = ({
         />
         <link rel="stylesheet" href="/utility.css" />
         <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+
         <style>{`
           .hide-cart {
             display: none !important;
+            
           }
         `}</style>
+        
       </head>
       <body class={active ? `page-${active}` : undefined}>
+        {/* Was accidentally left after </body> in a hand-edit — fixed,
+            belongs here so it's a real part of the render tree. */}
+        
+
         {/* ---------- Top bar ---------- */}
         <header class="topbar">
           <a href="/" class="brand-chip">
@@ -309,6 +437,40 @@ export const Layout: FC<LayoutProps> = ({
         </div>
 
         {/* ---------- Footer ---------- */}
+        {/* ---------- Product detail popup (bottom sheet, ~80% height) ---------- */}
+        {/* ProductCard's onclick opens this + hx-gets the product into
+            #detail-modal-body (see products.ts's GET /products/:id/panel).
+            A direct visit to /products/:id (no HX-Request header) skips
+            this entirely and gets the plain full-page version instead —
+            see ProductDetailPage.tsx. */}
+        <div class="modal-back" id="detailModal" onclick="if(event.target===this)closeSheet('detailModal')">
+          <div class="modal sheet-80">
+            <div class="grab"></div>
+            <button class="modal-close" onclick="closeSheet('detailModal')">✕</button>
+            <div id="detail-modal-body"></div>
+          </div>
+        </div>
+
+        {/* ---------- Fullscreen image viewer ---------- */}
+        {/* Opened by the gallery's own onclick (openViewer(imageUrls, i)) —
+            ported from the mockup's app.js, adapted to swap a real <img>
+            into #vImg instead of an emoji+background-color pair. */}
+        <div class="viewer" id="viewer">
+          <button class="v-close" onclick="closeViewer()">
+            ✕
+          </button>
+          <button class="v-nav v-prev" onclick="viewerGo(-1)">
+            ‹
+          </button>
+          <div class="v-stage">
+            <div class="v-img" id="vImg"></div>
+            <div class="v-count" id="vCount"></div>
+          </div>
+          <button class="v-nav v-next" onclick="viewerGo(1)">
+            ›
+          </button>
+        </div>
+
         <footer class="footer" id="footer">
           <div class="fgrid">
             <div>
@@ -375,11 +537,12 @@ export const Layout: FC<LayoutProps> = ({
             </a>
           ))}
         </nav>
-
+ 
         {/* ---------- Minimal shared JS (modal open/close + cart badge show/hide) ---------- */}
         <script>{raw(LAYOUT_SCRIPT)}</script>
       </body>
-      <div id="offline-banner" class="offline-banner">No internet connection</div>
+      
     </html>
   )
 }
+            

@@ -1,10 +1,12 @@
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
+import { and, eq, asc } from "drizzle-orm";
 import { getDB } from "../db";
 import { cartItems, products, orders, orderItems, customers } from "../db/schema";
 import { createAuth } from "../auth";
 import type { Env, Variables } from "../db";
 import { getAvailablePickupSlots } from "../lib/pickup-slots";
+import { razorpayConfigured } from "../lib/razorpay";
+import { cancelUnpaidOnlineOrders, expireStaleOnlineOrders } from "../lib/order-payments";
 import { CheckoutPage } from "../pages/CheckoutPage";
 import { OrderConfirmationPage } from "../pages/OrderConfirmationPage";
 import { redirect } from 'react-router-dom';
@@ -102,7 +104,14 @@ checkoutRoutes.get("/checkout", async (c) => {
   const totals = calcTotals(rows);
   const slots = getAvailablePickupSlots();
 
-  return c.html(<CheckoutPage items={items} totals={totals} slots={slots} />);
+  return c.html(
+    <CheckoutPage
+      items={items}
+      totals={totals}
+      slots={slots}
+      onlineEnabled={razorpayConfigured(c.env)}
+    />
+  );
 });
 
 checkoutRoutes.post("/checkout", async (c) => {
@@ -120,6 +129,8 @@ checkoutRoutes.post("/checkout", async (c) => {
   const pickupSlot = String(body.pickupSlot || "");
   const customerName = String(body.customerName || "").trim();
   const customerPhone = String(body.customerPhone || "").trim();
+  // Anything other than "online" is the default, pay at counter.
+  const paymentMethod: "counter" | "online" = body.paymentMethod === "online" ? "online" : "counter";
 
   // The browser already checks these (see CheckoutPage.tsx); this is the
   // server-side backstop for anyone bypassing the form.
@@ -140,13 +151,14 @@ checkoutRoutes.post("/checkout", async (c) => {
       400
     );
   }
+  if (paymentMethod === "online" && !razorpayConfigured(c.env)) {
+    return c.text("Online payment isn't available right now. Please choose pay at counter.", 400);
+  }
 
   const cartRows = await db
     .select({
       productId: cartItems.productId,
       quantityKg: cartItems.quantityKg,
-      name: products.itemName,
-      imageUrl: products.imageUrl,
       pricePerKg: products.pricePerKg,
       discount: products.discount,
     })
@@ -167,6 +179,9 @@ checkoutRoutes.post("/checkout", async (c) => {
   // Customer pays the selling price (pay), not the MRP.
   const { pay: totalAmount } = calcTotals(cartRows);
 
+  // Starting a new checkout replaces any online order still waiting for payment.
+  await cancelUnpaidOnlineOrders(db, customerId);
+
   const [insertedOrder] = await db
     .insert(orders)
     .values({
@@ -176,6 +191,11 @@ checkoutRoutes.post("/checkout", async (c) => {
       customerName,
       customerPhone,
       totalAmount,
+      paymentMethod,
+      paymentStatus: "unpaid",
+      // Online orders remember which cart they came from, so the cart can be
+      // cleared once the payment is confirmed (even if only the webhook sees it).
+      cartSessionId: paymentMethod === "online" ? sessionId : null,
     })
     .returning();
 
@@ -188,21 +208,66 @@ checkoutRoutes.post("/checkout", async (c) => {
     }))
   );
 
-  // Cart cleared once the order is placed.
+  if (paymentMethod === "online") {
+    // Cart stays until the payment succeeds.
+    return c.redirect(`/checkout/pay/${insertedOrder.orderId}`, 303);
+  }
+
+  // Counter order: nothing more to wait for, so the cart is cleared now.
   await db.delete(cartItems).where(eq(cartItems.sessionId, sessionId));
+  return c.redirect(`/order-confirmed/${insertedOrder.orderId}`, 303);
+});
+
+// Confirmation page for an order that is placed (counter) or paid (online).
+checkoutRoutes.get("/order-confirmed/:orderId", async (c) => {
+  const orderId = Number(c.req.param("orderId"));
+  if (!Number.isInteger(orderId)) return c.notFound();
+
+  const customerId = await getLoggedInCustomerId(c);
+  if (!customerId) {
+    return c.redirect("/login?redirect=" + encodeURIComponent(`/order-confirmed/${orderId}`));
+  }
+
+  const db = getDB(c.env);
+  await expireStaleOnlineOrders(db, customerId);
+
+  const [order] = await db
+    .select()
+    .from(orders)
+    .where(and(eq(orders.orderId, orderId), eq(orders.customerId, customerId)));
+
+  if (!order) return c.notFound();
+
+  // An online order that isn't paid yet isn't "confirmed": send it back to payment, or to its page if cancelled.
+  if (order.paymentMethod === "online" && order.paymentStatus !== "paid") {
+    return c.redirect(order.status === "Cancelled" ? `/orders/${orderId}` : `/checkout/pay/${orderId}`);
+  }
+  if (order.status === "Cancelled") {
+    return c.redirect(`/orders/${orderId}`);
+  }
+
+  const items = await db
+    .select({
+      name: products.itemName,
+      quantityKg: orderItems.weightKg,
+      imageUrl: products.imageUrl,
+    })
+    .from(orderItems)
+    .innerJoin(products, eq(orderItems.productId, products.productId))
+    .where(eq(orderItems.orderId, orderId))
+    .orderBy(asc(orderItems.itemId));
 
   return c.html(
     <OrderConfirmationPage
-      orderId={insertedOrder.orderId}
-      customerName={customerName}
-      customerPhone={customerPhone}
-      pickupSlot={pickupSlot}
-      items={cartRows.map((r) => ({
-        name: r.name,
-        quantityKg: r.quantityKg,
-        imageUrl: r.imageUrl,
-      }))}
-      total={totalAmount}
+      orderId={order.orderId}
+      customerName={order.customerName}
+      customerPhone={order.customerPhone}
+      pickupSlot={order.pickupSlot}
+      items={items}
+      total={order.totalAmount}
+      status={order.status}
+      paymentMethod={order.paymentMethod}
+      paymentStatus={order.paymentStatus}
     />
   );
-});  
+});

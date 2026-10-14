@@ -68,3 +68,17 @@ export function groupBySizeVariants(rows: ProductRow[]): ProductCardData[] {
 export function maxVariantStock(card: ProductCardData): number {
   return Math.max(...card.variants.map((v) => v.inStockKg))
 }
+
+/**
+ * Pushes cards with zero available stock (across every size) to the end,
+ * leaving everything else in whatever order it was already in — a
+ * stable partition, not a full re-sort, so it doesn't fight whatever
+ * ordering (name, newest, etc.) the caller already applied. Use on
+ * ProductsListPage; HomePage's "top by stock" sort already puts
+ * out-of-stock items last as a side effect of sorting by quantity.
+ */
+export function sortOutOfStockLast(cards: ProductCardData[]): ProductCardData[] {
+  const inStock = cards.filter((c) => maxVariantStock(c) > 0)
+  const outOfStock = cards.filter((c) => maxVariantStock(c) === 0)
+  return [...inStock, ...outOfStock]
+}

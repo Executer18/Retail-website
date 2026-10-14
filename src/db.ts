@@ -24,6 +24,9 @@ export interface Env {
   BETTER_AUTH_URL: string;
   RESEND_API_KEY?: string;
   IS_LOCAL?: string;
+  RAZORPAY_KEY_ID: string;
+RAZORPAY_KEY_SECRET: string;
+RAZORPAY_WEBHOOK_SECRET: string;
 }
 
 export function getDB(env: Env) {

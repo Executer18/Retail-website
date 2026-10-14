@@ -30,6 +30,14 @@ import { Layout } from './components/Layout'
 import { groupBySizeVariants, maxVariantStock } from './lib/product-variants'
 import { getCartQuantities } from './routes/cart';
 import { contextStorage } from 'hono/context-storage'
+import { sortOutOfStockLast } from './lib/product-variants'
+import { getCartQuantities } from './routes/cart'
+import { productRoutes } from './routes/products'
+import { contactRoutes } from './routes/contact'
+import { accountRoutes } from './routes/account' 
+import { paymentRoutes } from './routes/payment'
+
+
 
 const app = new Hono<{ Bindings: Env }>()
 
@@ -57,12 +65,16 @@ app.use("*", sessionMiddleware);
 
 app.get('/order', (c) => c.html(<OrderLandingPage />))
 
+
+app.route('/', paymentRoutes)   
+app.route('/', accountRoutes)
+app.route('/', contactRoutes)
 app.route('/', cartRoutes)
 app.route('/', checkoutRoutes)
 app.route('/', orderRoutes)
 app.route('/', grindQuoteRoutes)
 app.route('/', sellQuoteRoutes)
-
+app.route('/', productRoutes)
 
 
 // ---------- Home page ----------
@@ -92,8 +104,13 @@ app.get('/', async (c) => {
 
 
 
+
+
+
+
 app.get('/products', async (c) => {
   const db = getDB(c.env)
+  const sessionId = c.get('sessionId')
   const activeCategory = c.req.query('category') || null
   const searchQuery = c.req.query('q') || null
 
@@ -101,79 +118,73 @@ app.get('/products', async (c) => {
   if (activeCategory) conditions.push(eq(products.category, activeCategory))
   if (searchQuery) conditions.push(like(products.itemName, `%${searchQuery}%`))
 
-  const rows =
-    conditions.length > 0
-      ? await db.select().from(products).where(and(...conditions))
-      : await db.select().from(products)
+  const rows = conditions.length > 0 ? await db.select().from(products).where(and(...conditions)) : await db.select().from(products)
 
   const allRows = await db.select({ category: products.category }).from(products)
   const categories = Array.from(new Set(allRows.map((r) => r.category))).sort()
+  const cartQuantities = await getCartQuantities(db, sessionId)
 
   return c.html(
     <ProductsListPage
-      products={groupBySizeVariants(rows)}
+      products={sortOutOfStockLast(groupBySizeVariants(rows))}
       categories={categories}
       activeCategory={activeCategory}
       searchQuery={searchQuery}
+      cartQuantities={cartQuantities}
     />
   )
 })
 
+
+
 // ---------- Product detail ----------
+import { ProductDetailContent, ProductDetailPage } from './pages/ProductDetailPage'
+import { groupBySizeVariants, sortOutOfStockLast } from './lib/product-variants'
+import { getCartQuantities } from './routes/cart'
+
 app.get('/products/:id', async (c) => {
   const db = getDB(c.env)
   const id = parseInt(c.req.param('id'), 10)
+  const sessionId = c.get('sessionId')
 
   const [row] = await db.select().from(products).where(eq(products.productId, id))
-  if (!row) {
-    return c.notFound()
+  if (!row) return c.notFound()
+
+  const imageRows = await db.select().from(productImages).where(eq(productImages.productId, id)).orderBy(asc(productImages.sortOrder))
+  const images = imageRows.length > 0 ? imageRows.map((img) => img.imageUrl) : row.imageUrl ? [row.imageUrl] : []
+
+  // This product's own pack-size siblings, for the inline SELECT SIZE control
+  const siblingRows = await db.select().from(products).where(eq(products.itemName, row.itemName))
+  const [family] = groupBySizeVariants(siblingRows)
+
+  const sameCategoryRows = await db.select().from(products).where(and(eq(products.category, row.category), ne(products.productId, id))).limit(10)
+  const otherRows = await db.select().from(products).where(ne(products.category, row.category)).limit(10)
+
+  const cartQuantities = await getCartQuantities(db, sessionId)
+
+  const props = {
+    product: {
+      id: row.productId,
+      name: row.itemName,
+      category: row.category,
+      pricePerKg: row.pricePerKg,
+      inStockKg: row.inStockKg,
+      discountPct: row.discount ?? 0,
+      images,
+      description: row.description,
+      highlights: row.highlights ? row.highlights.split('\n').map((l) => l.trim()).filter(Boolean) : [],
+      ingredients: row.ingredients,
+      variants: family?.variants ?? [],
+    },
+    sameCategoryProducts: groupBySizeVariants(sameCategoryRows).slice(0, 6),
+    otherProducts: groupBySizeVariants(otherRows).slice(0, 6),
+    cartQuantities,
   }
 
-  const imageRows = await db
-    .select()
-    .from(productImages)
-    .where(eq(productImages.productId, id))
-    .orderBy(asc(productImages.sortOrder))
-
-  const images =
-    imageRows.length > 0
-      ? imageRows.map((img) => img.imageUrl)
-      : row.imageUrl
-        ? [row.imageUrl]
-        : []
-
-  const sameCategoryRows = await db
-    .select()
-    .from(products)
-    .where(and(eq(products.category, row.category), ne(products.productId, id)))
-    .limit(6)
-
-  const otherRows = await db
-    .select()
-    .from(products)
-    .where(ne(products.category, row.category))
-    .limit(6)
-
-  return c.html(
-    <ProductDetailPage
-      product={{
-        id: row.productId,
-        name: row.itemName,
-        category: row.category,
-        pricePerKg: row.pricePerKg,
-        inStockKg: row.inStockKg,
-        images,
-        description: row.description,
-        ingredients: row.ingredients,
-      }}
-      sameCategoryProducts={sameCategoryRows.map(toCardData)}
-      otherProducts={otherRows.map(toCardData)}
-    />
-  )
+  // ProductCard's click is an htmx request (fills the popup); a direct
+  // visit to this URL isn't, and gets the plain full-page fallback.
+  return c.html(c.req.header('HX-Request') ? <ProductDetailContent {...props} /> : <ProductDetailPage {...props} />)
 })
-
-
-  
 
 
 

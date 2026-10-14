@@ -120,6 +120,39 @@ export const CHECKOUT_CSS = `
 .ck-kv--total b{color:var(--ck-primary)}
 .ck-actions{margin:0 14px 14px;display:grid;gap:10px}
 
+/* ---------- Payment method options (checkout) ---------- */
+.ck-payopt{display:block;position:relative;margin-bottom:10px;cursor:pointer}
+.ck-payopt:last-child{margin-bottom:0}
+.ck-payopt input{position:absolute;opacity:0;pointer-events:none}
+.ck-payopt__box{display:flex;align-items:center;gap:12px;padding:13px 14px;border:1.5px solid var(--ck-border);
+  border-radius:var(--ck-soft);background:var(--ck-surface);transition:border-color var(--ck-base),background var(--ck-base)}
+.ck-payopt__dot{width:18px;height:18px;flex:none;border-radius:50%;border:2px solid var(--ck-border);
+  display:grid;place-items:center;transition:border-color var(--ck-base)}
+.ck-payopt__dot::after{content:'';width:8px;height:8px;border-radius:50%;background:var(--ck-primary);
+  transform:scale(0);transition:transform .18s}
+.ck-payopt__txt{min-width:0}
+.ck-payopt__txt b{display:block;font-size:13.5px;color:var(--ck-ink)}
+.ck-payopt__txt small{font-size:11.5px;color:var(--ck-muted)}
+.ck-payopt__tag{margin-left:auto;flex:none;font-size:9.5px;font-weight:800;letter-spacing:.06em;padding:3px 8px;
+  border-radius:var(--ck-round);background:var(--ck-warning-bg);color:var(--ck-warning);text-transform:uppercase}
+.ck-payopt input:checked + .ck-payopt__box{border-color:var(--ck-primary);background:var(--ck-primary-light)}
+.ck-payopt input:checked + .ck-payopt__box .ck-payopt__dot{border-color:var(--ck-primary)}
+.ck-payopt input:checked + .ck-payopt__box .ck-payopt__dot::after{transform:scale(1)}
+.ck-payopt input:focus-visible + .ck-payopt__box{outline:2px solid var(--ck-primary);outline-offset:2px}
+
+/* ---------- Pay page ---------- */
+.ck-amount{margin:14px;background:var(--ck-surface);border:1.5px solid var(--ck-border);border-radius:var(--ck-soft);
+  padding:20px;text-align:center}
+.ck-amount small{font-size:12px;color:var(--ck-muted);display:block}
+.ck-amount b{display:block;font-size:32px;font-weight:800;color:var(--ck-primary);margin-top:4px}
+.ck-amount p{font-size:12px;color:var(--ck-muted);margin:8px 0 0}
+.ck-testbox{margin:0 14px 14px;background:var(--ck-warning-bg);color:var(--ck-warning);border-radius:var(--ck-soft);
+  padding:12px 14px;font-size:12px;line-height:1.6}
+.ck-testbox b{color:var(--ck-warning)}
+.ck-textbtn{display:block;width:100%;text-align:center;font-size:13px;font-weight:700;color:var(--ck-muted);padding:10px;
+  text-decoration:underline;text-underline-offset:3px}
+.ck-textbtn:disabled{opacity:.6;cursor:default}
+
 /* ---------- Toast ---------- */
 .ck-toast{position:fixed;left:50%;bottom:calc(var(--ck-nav-h,64px) + 76px);transform:translate(-50%,20px);
   background:var(--ck-ink);color:#fff;padding:11px 18px;border-radius:var(--ck-round);font-size:13px;font-weight:600;
