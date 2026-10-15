@@ -1,4 +1,4 @@
-// src/routes/products.ts
+// src/routes/products.tsx
 //
 // New file. Just the one route Layout's shared #variantModal needs:
 // GET /api/products/:id/variants fills #variant-modal-body with every

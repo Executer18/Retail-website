@@ -1,5 +1,5 @@
 import type { FC } from 'hono/jsx'
-import { rupee, formatSize } from '../lib/format'
+import { rupee, formatSize, formatUnitPrice, packPrice, toPackCount } from '../lib/format'
 
 export type ProductVariant = {
   id: number
@@ -17,24 +17,22 @@ export type ProductCardData = {
   inStockKg: number
   discountPct: number
   imageUrl: string | null
-  /** Every pack size for this item (same itemName — see product-variants.ts). Always at least length 1, this card's own size included. */
+  /** Every pack size for this item (same itemName — see product-variants.ts). ProductCard reads the whole list (for its chip row); AddToCartControl only ever looks at variants[0] — see its own note below. */
   variants: ProductVariant[]
 }
 
-// The ADD / stepper / SELECT SIZE control — pulled out of ProductCard so
-// ProductDetailPage can render the exact same thing inline (right after
-// the name+price, per your ask) instead of a second, drifting copy of
-// the add-to-cart logic. Used two ways:
-//   - inside a .pcard grid card: flyOriginExpr defaults to
-//     "this.closest('.pcard')", and this control's own id (addrow-{id})
-//     sits nested inside the card's id (pcard-{id})
-//   - standalone on the product detail page: pass a flyOriginExpr that
-//     points at the big gallery image instead (see ProductDetailPage.tsx)
+// The ADD / stepper for exactly ONE variant — this never shows a size
+// picker itself (ProductCard's chip row and ProductDetailPage's variant
+// boxes handle picking; this just adds/steps whichever single variant
+// its caller already decided on). Only variants[0] is ever read, so
+// callers representing "one specific variant" (ProductDetailPage, and
+// cart.tsx's renderCardOob) must pass a `variants` array containing
+// just that one — don't pass a whole multi-size family here.
 //
-// cart.tsx's renderCardOob() emits an OOB update for BOTH id patterns
-// after every cart change, so whichever context this is rendered in —
-// grid card, detail page, both at once if the sheet is open over the
-// grid — stays in sync from one route.
+// Shows PACK COUNT (1, 2, 3…), not raw kilograms: delta sent to the
+// server is still the variant's sizeKg in kg (so cart totals stay
+// correct), only the number printed in the stepper is converted via
+// toPackCount.
 export const AddToCartControl: FC<{
   product: ProductCardData
   currentQtyKg?: number
@@ -43,8 +41,8 @@ export const AddToCartControl: FC<{
   oob?: boolean
 }> = ({ product, currentQtyKg = 0, flyOriginExpr = "this.closest('.pcard')", oob = false }) => {
   const isOutOfStock = product.inStockKg <= 0
-  const hasMultipleSizes = product.variants.length > 1
   const sizeKg = product.variants[0].sizeKg
+  const packCount = toPackCount(currentQtyKg, sizeKg)
   const atMax = currentQtyKg >= product.inStockKg
   const fly = `flyToCart((${flyOriginExpr}).querySelector('img'), (${flyOriginExpr}));toast('Added to cart 🛒')`
 
@@ -54,62 +52,59 @@ export const AddToCartControl: FC<{
         <button class="addbtn" disabled style="opacity:.5">
           Out of stock
         </button>
-      ) : hasMultipleSizes ? (
-        <button
-          type="button"
-          class="addbtn"
-          hx-get={`/api/products/${product.id}/variants`}
-          hx-target="#variant-modal-body"
-          hx-swap="innerHTML"
-          onclick="openSheet('variantModal')"
-        >
-          SELECT SIZE
-        </button>
-      ) : (
+      ) : packCount === 0 ? (
         <form hx-post={`/api/cart/adjust/${product.id}`} hx-target="#cart-count" hx-swap="innerHTML">
           <input type="hidden" name="delta" value={sizeKg} />
           <button type="submit" class="addbtn" onclick={fly}>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M2 3h2l.4 2M5.5 14h11l3-8H5.4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-              <circle cx="8" cy="19" r="1.6" fill="currentColor" />
-              <circle cx="16" cy="19" r="1.6" fill="currentColor" />
-              <path d="M14 7.5v4M12 9.5h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-            </svg>
+           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+               <circle cx="9" cy="20" r="1.5" />
+                <circle cx="18" cy="20" r="1.5" />
+                <path d="M2 3h3l2.6 12.5h11L21 7H6" />
+              </svg> 
+              Add to Cart
           </button>
         </form>
-      )}
+      ) : null}
 
-      {!isOutOfStock && !hasMultipleSizes && (
+      {!isOutOfStock && packCount > 0 && (
         <div class="stepper">
           <form hx-post={`/api/cart/adjust/${product.id}`} hx-target="#cart-count" hx-swap="innerHTML">
             <input type="hidden" name="delta" value={-sizeKg} />
             <button type="submit">−</button>
           </form>
-          <b>{currentQtyKg}</b>
-          <form hx-post={`/api/cart/adjust/${product.id}`} hx-target="#cart-count" hx-swap="innerHTML">
+          <b>{packCount}</b>
+         
+        <form hx-post={`/api/cart/adjust/${product.id}`} hx-target="#cart-count" hx-swap="innerHTML">
             <input type="hidden" name="delta" value={sizeKg} />
-            <button type="submit" disabled={atMax} onclick={fly}>
+            <button
+  type="submit"
+  class={atMax ? 'plus is-max' : 'plus'}
+  data-avail={toPackCount(product.inStockKg, sizeKg)}
+  onclick={fly}
+>
               +
             </button>
           </form>
+
+          
         </div>
       )}
     </div>
   )
 }
 
-export const ProductCard: FC<{ product: ProductCardData; currentQtyKg?: number; oob?: boolean }> = ({
-  product,
-  currentQtyKg = 0,
-  oob = false,
-}) => {
+export const ProductCard: FC<{
+  product: ProductCardData
+  /** productId -> quantityKg for the WHOLE session cart, not just this card's primary variant — a multi-size card needs every sibling's own qty for its chip badges. */
+  cartQuantities: Record<number, number>
+  oob?: boolean
+}> = ({ product, cartQuantities, oob = false }) => {
   const isOutOfStock = product.inStockKg <= 0
   const hasMultipleSizes = product.variants.length > 1
-  const sizeKg = product.variants[0].sizeKg
+  const primaryVariant = product.variants[0]
+  const currentQtyKg = cartQuantities[product.id] ?? 0
   const inCart = currentQtyKg > 0
-  // Opens the bottom-sheet popup instead of navigating: the GET fills
-  // #detail-modal-body, the onclick opens the sheet right away (same
-  // "don't wait on the response to open" pattern as SELECT SIZE below).
+  const flyExpr = "this.closest('.pcard')"
 
   return (
     <div
@@ -145,16 +140,42 @@ export const ProductCard: FC<{ product: ProductCardData; currentQtyKg?: number; 
         >
           {product.name}
         </div>
-        <div class="wt">
-          {formatSize(sizeKg)} · Stone ground
-          {hasMultipleSizes && <span class="size-badge">+{product.variants.length - 1}</span>}
-        </div>
-        <div class="pr">
-          {rupee(product.pricePerKg)}
-          {product.discountPct > 0 && <s>{rupee(product.pricePerKg / (1 - product.discountPct / 100))}</s>}
-        </div>
 
-        <AddToCartControl product={product} currentQtyKg={currentQtyKg} />
+        <div class="pr">
+          {rupee(packPrice(product.pricePerKg, primaryVariant.sizeKg))}
+          {product.discountPct > 0 && (
+            <s>{rupee(packPrice(product.pricePerKg, primaryVariant.sizeKg) / (1 - product.discountPct / 100))}</s>
+          )}
+        </div>
+        <div class="unit-price">{formatUnitPrice(product.pricePerKg, primaryVariant.sizeKg)}</div>
+
+        {hasMultipleSizes ? (
+          <div class="variant-chip-row">
+            {product.variants.map((v) => {
+              const vQtyKg = cartQuantities[v.id] ?? 0
+              const vPackCount = toPackCount(vQtyKg, v.sizeKg)
+              const vOutOfStock = v.inStockKg <= 0
+              return (
+                <form hx-post={`/api/cart/adjust/${v.id}`} hx-target="#cart-count" hx-swap="innerHTML">
+                  <input type="hidden" name="delta" value={v.sizeKg} />
+                  <button
+                    type="submit"
+                    class={`variant-chip${vPackCount > 0 ? ' has-qty' : ''}`}
+                    disabled={vOutOfStock}
+                    data-avail={toPackCount(v.inStockKg, v.sizeKg)}
+                    onclick={vOutOfStock ? undefined : `flyToCart((${flyExpr}).querySelector('img'), (${flyExpr}));toast('Added to cart 🛒')`}
+                  >
+                    <span class="variant-chip__size">{formatSize(v.sizeKg)}</span>
+                    <span class="variant-chip__price">{rupee(packPrice(v.pricePerKg, v.sizeKg))}</span>
+                    {vPackCount > 0 && <span class="variant-chip__badge">{vPackCount}</span>}
+                  </button>
+                </form>
+              )
+            })}
+          </div>
+        ) : (
+          <AddToCartControl product={product} currentQtyKg={currentQtyKg} />
+        )}
       </div>
     </div>
   )

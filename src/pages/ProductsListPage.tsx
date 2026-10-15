@@ -78,7 +78,7 @@ export const ProductsListPage: FC<{
       {products.length > 0 ? (
         <div class="prodgrid">
           {products.map((product) => (
-            <ProductCard product={product} currentQtyKg={cartQuantities[product.id] ?? 0} />
+            <ProductCard product={product} cartQuantities={cartQuantities} />
           ))}
           {isFiltered && (
             <div class="clear-wrap">

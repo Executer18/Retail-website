@@ -2,46 +2,27 @@
 //
 // Route: GET /products/:id
 //
-// Rebuilt as a bottom-sheet popup instead of a standalone page, per your
-// ask. Two exports:
-//   - ProductDetailContent: the actual content, no Layout wrapper. This
-//     is what index.tsx returns for an htmx request (ProductCard's click
-//     hx-gets this route and swaps the result into Layout's
-//     #detail-modal-body — see Layout.tsx's #detailModal).
-//   - ProductDetailPage: ProductDetailContent wrapped in Layout, for a
-//     DIRECT visit to /products/:id (shared link, new tab, no htmx
-//     header on the request) — there's no grid underneath to show a
-//     popup "over", so this degrades to a plain full page rather than
-//     an empty/broken sheet. index.tsx picks between the two based on
-//     the HX-Request header — see the note at the bottom of this file.
+// Bottom-sheet popup (ProductDetailContent) + plain-page fallback for a
+// direct visit (ProductDetailPage) — see the note at the bottom of this
+// file for how index.tsx should pick between the two.
 //
-// Changes from the old version, per your ask:
-//   - gallery box uses the OLD stylesheet's containment technique
-//     (fixed aspect-ratio + object-fit:cover) instead of the mockup's
-//     fixed height:300px, so it can't distort regardless of the source
-//     photo's own aspect ratio
-//   - numbered dots (mockup's own .pd-dot is already "1,2,3…" style —
-//     no change needed there, just stopped using the old plain-dot CSS)
-//   - fullscreen viewer ported from the mockup's openViewer/viewerGo,
-//     adapted for real photos (object-fit:contain, not an emoji glyph)
-//   - "Highlights" now reads product.highlights (a real column) instead
-//     of being derived by splitting the description into lines — ADD A
-//     highlights COLUMN TO products IN schema.ts, this won't compile
-//     against your current schema otherwise. Assumed newline-separated
-//     text, same convention the old description-splitting code used.
-//   - Add to Cart moved inline, right after name+price — no more fixed
-//     bottom buy-bar. It's the exact same AddToCartControl ProductCard
-//     uses (imported, not reimplemented), so the stepper, out-of-stock
-//     state, size-variant picker, max-quantity warning, and fly-to-cart
-//     animation are automatically identical to the grid — cart.tsx's
-//     renderCardOob() already keeps both in sync after any change.
-//   - mockup's exact return/exchange and data-privacy copy from
-//     product.html, swapped in for the old page's generic placeholder text
+// Size selection is boxed chips, not the shared popup: pick one to
+// reveal ITS OWN DetailCartControl (every variant's control is pre-rendered
+// here, just hidden via display:none until picked — Layout.tsx's
+// selectDetailVariant() toggles that, no network round trip for switching
+// sizes). Trying to add before picking a size shows a red "Please select a
+// size" message (pure frontend — see requireVariantSelection() in Layout.tsx).
+//
+// Cart sync: DetailCartControl (id `pd-addrow-{variantId}`) and the size
+// box badge (id `pd-vbadge-{variantId}`) are re-sent as out-of-band swaps
+// by cart.tsx's renderCardOob() after every add/adjust/update/remove, so
+// they always match the grid card and the cart popup.
 
 import type { FC } from 'hono/jsx'
 import { Layout } from '../components/Layout'
-import { ProductCard, AddToCartControl, type ProductCardData, type ProductVariant } from '../components/ProductCard'
-import { rupee } from '../lib/format'
+import { ProductCard, type ProductCardData, type ProductVariant } from '../components/ProductCard'
+import { DetailCartControl, DetailVariantBadge } from '../components/DetailCartControl'
+import { rupee, formatSize, formatUnitPrice, packPrice } from '../lib/format'
 
 export type ProductDetail = {
   id: number
@@ -52,10 +33,10 @@ export type ProductDetail = {
   discountPct: number
   images: string[]
   description?: string | null
-  /** From the new products.highlights column — pre-split into lines by the route, NOT derived from description. */
+  /** From the products.highlights column — pre-split into lines by the route, NOT derived from description. */
   highlights: string[]
   ingredients?: string | null
-  /** This product's own pack-size siblings, for the inline add-to-cart control (SELECT SIZE when length > 1). Always includes this product itself. */
+  /** This product's own pack-size siblings (itself included). Always at least length 1. */
   variants: ProductVariant[]
 }
 
@@ -63,30 +44,28 @@ type ProductDetailProps = {
   product: ProductDetail
   sameCategoryProducts: ProductCardData[]
   otherProducts: ProductCardData[]
-  /** productId -> quantityKg in the session's cart — same map HomePage/ProductsListPage use, needed here for both the main product and the suggestion cards. */
+  /** productId -> quantityKg for the whole session cart — same map every other page uses. */
   cartQuantities: Record<number, number>
 }
 
 export const ProductDetailContent: FC<ProductDetailProps> = ({ product, sameCategoryProducts, otherProducts, cartQuantities }) => {
   const images = product.images
+  const hasMultipleSizes = product.variants.length > 1
+  const primaryVariant = product.variants[0]
+
+  // If one of the sizes is already in the cart, open with it pre-selected so
+  // its stepper is visible straight away. Otherwise nothing is selected and
+  // the shopper must pick a size first (existing behaviour).
+  const selectedId = hasMultipleSizes
+    ? product.variants.find((v) => (cartQuantities[v.id] ?? 0) > 0)?.id
+    : undefined
+
   const ingredientList = product.ingredients
     ? product.ingredients
         .split(',')
         .map((item) => item.trim())
         .filter(Boolean)
     : []
-
-  const cardData: ProductCardData = {
-    id: product.id,
-    name: product.name,
-    category: product.category,
-    pricePerKg: product.pricePerKg,
-    inStockKg: product.inStockKg,
-    discountPct: product.discountPct,
-    imageUrl: images[0] ?? null,
-    variants: product.variants,
-  }
-  const currentQtyKg = cartQuantities[product.id] ?? 0
 
   return (
     <>
@@ -124,20 +103,63 @@ export const ProductDetailContent: FC<ProductDetailProps> = ({ product, sameCate
         <p class="pd-meta">{product.category}</p>
         <h1>{product.name}</h1>
         <div class="pd-price">
-          <b>{rupee(product.pricePerKg)}</b>
+          <b>{rupee(packPrice(product.pricePerKg, primaryVariant.sizeKg))}</b>
           {product.discountPct > 0 && (
             <>
-              <s>{rupee(product.pricePerKg / (1 - product.discountPct / 100))}</s>
+              <s>{rupee(packPrice(product.pricePerKg, primaryVariant.sizeKg) / (1 - product.discountPct / 100))}</s>
               <span class="save">{product.discountPct}% OFF</span>
             </>
           )}
+          <span class="pd-unit-price">{formatUnitPrice(product.pricePerKg, primaryVariant.sizeKg)}</span>
         </div>
 
-        {/* Add to cart — right after name+price, not a fixed buy-bar.
-            Same control the grid card uses; flyOriginExpr points at the
-            gallery above instead of a .pcard ancestor since there isn't
-            one here. */}
-        <AddToCartControl product={cardData} currentQtyKg={currentQtyKg} flyOriginExpr="document.getElementById('pd-main-img-wrap')" />
+        {/* ---------- Add to cart — right after name+price ---------- */}
+        {hasMultipleSizes ? (
+          <>
+            <div class="variant-box-row">
+              {product.variants.map((v) => {
+                const vQtyKg = cartQuantities[v.id] ?? 0
+                // Can't pick a size that has less than one full pack left —
+                // unless it's already in the cart (so it can still be reduced).
+                const vOutOfStock = v.inStockKg + 1e-9 < v.sizeKg && vQtyKg === 0
+                return (
+                  <button
+                    type="button"
+                    class={`variant-box${vOutOfStock ? ' variant-box--disabled' : ''}${v.id === selectedId ? ' on' : ''}`}
+                    disabled={vOutOfStock}
+                    onclick={`selectDetailVariant(this, ${v.id})`}
+                  >
+                    <span class="variant-box__size">{formatSize(v.sizeKg)}</span>
+                    <span class="variant-box__price">{rupee(packPrice(v.pricePerKg, v.sizeKg))}</span>
+                    {vOutOfStock && <span class="variant-box__oos">Out of stock</span>}
+                    <DetailVariantBadge variant={v} qtyKg={vQtyKg} />
+                  </button>
+                )
+              })}
+            </div>
+            <p id="variant-required-msg" class="variant-required-msg" style="display:none">
+              Please select a size
+            </p>
+            <div id="variant-placeholder-addrow" class="pd-cart" style={selectedId !== undefined ? 'display:none' : undefined}>
+              <button type="button" class="pd-cart__add" onclick="requireVariantSelection()">
+                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="9" cy="20" r="1.5" />
+                  <circle cx="18" cy="20" r="1.5" />
+                  <path d="M2 3h3l2.6 12.5h11L21 7H6" />
+                </svg>
+                Add to Cart
+                
+              </button>
+            </div>
+            {product.variants.map((v) => (
+              <div data-variant-wrap={v.id} style={v.id === selectedId ? undefined : 'display:none'}>
+                <DetailCartControl variant={v} qtyKg={cartQuantities[v.id] ?? 0} />
+              </div>
+            ))}
+          </>
+        ) : (
+          <DetailCartControl variant={primaryVariant} qtyKg={cartQuantities[primaryVariant.id] ?? 0} />
+        )}
 
         {product.highlights.length > 0 && (
           <div class="pd-block">
@@ -184,13 +206,14 @@ export const ProductDetailContent: FC<ProductDetailProps> = ({ product, sameCate
         Razorpay; we never see or store card numbers.
       </p>
 
-      {/* ---------- Suggestions ---------- */}
+      {/* ---------- Suggestions (same logic as before: same category minus
+          this item, then everything outside that category) ---------- */}
       {sameCategoryProducts.length > 0 && (
         <div class="pd-suggest">
           <h4>More {product.category}</h4>
           <div class="pd-suggest-row">
             {sameCategoryProducts.map((p) => (
-              <ProductCard product={p} currentQtyKg={cartQuantities[p.id] ?? 0} />
+              <ProductCard product={p} cartQuantities={cartQuantities} />
             ))}
           </div>
         </div>
@@ -201,7 +224,7 @@ export const ProductDetailContent: FC<ProductDetailProps> = ({ product, sameCate
           <h4>You might also like</h4>
           <div class="pd-suggest-row">
             {otherProducts.map((p) => (
-              <ProductCard product={p} currentQtyKg={cartQuantities[p.id] ?? 0} />
+              <ProductCard product={p} cartQuantities={cartQuantities} />
             ))}
           </div>
         </div>

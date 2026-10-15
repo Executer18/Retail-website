@@ -16,7 +16,7 @@ import { eq, ne, and, or, asc, desc, like, sql } from 'drizzle-orm'
 import { products, productImages } from './db/schema'
 import { HomePage } from './pages/HomePage'
 import { ProductsListPage } from './pages/ProductsListPage'
-import { ProductDetailPage } from './pages/ProductDetailPage'
+import { ProductDetailPage, ProductDetailContent } from './pages/ProductDetailPage'
 import type { ProductCardData } from './components/ProductCard'
 import { sessionMiddleware } from "./middleware/session";
 import { cartRoutes } from './routes/cart'
@@ -31,7 +31,7 @@ import { groupBySizeVariants, maxVariantStock } from './lib/product-variants'
 import { getCartQuantities } from './routes/cart';
 import { contextStorage } from 'hono/context-storage'
 import { sortOutOfStockLast } from './lib/product-variants'
-import { getCartQuantities } from './routes/cart'
+
 import { productRoutes } from './routes/products'
 import { contactRoutes } from './routes/contact'
 import { accountRoutes } from './routes/account' 
@@ -138,9 +138,9 @@ app.get('/products', async (c) => {
 
 
 // ---------- Product detail ----------
-import { ProductDetailContent, ProductDetailPage } from './pages/ProductDetailPage'
-import { groupBySizeVariants, sortOutOfStockLast } from './lib/product-variants'
-import { getCartQuantities } from './routes/cart'
+
+
+
 
 app.get('/products/:id', async (c) => {
   const db = getDB(c.env)

@@ -65,6 +65,16 @@ const LAYOUT_SCRIPT = `
   // Cart line "− [input] +" stepper (CartContents.tsx). Defined once here
   // (not inside the htmx-swapped fragment) since htmx doesn't re-run
   // <script> tags reliably in swapped-in content.
+    // Cart line "− [input] +" stepper (CartContents.tsx). Defined once here
+  // (not inside the htmx-swapped fragment) since htmx doesn't re-run
+  // <script> tags reliably in swapped-in content.
+  // The visible input is a PACK COUNT (1, 2, 3…), step=1 always,
+  // regardless of whether one pack is 0.05kg or 5kg — it carries
+  // data-size-kg so we can convert back to the actual kg the server
+  // expects. The visible input itself has no "name" (never submitted
+  // directly); syncPackQtyHidden() writes the real kg amount into the
+  // sibling hidden field (.ci-step__kg-hidden, name="quantityKg") right
+  // before every submit.
   function bumpQty(btn, delta){
     var form = btn.closest('form');
     var input = form.querySelector('.ci-step__input');
@@ -76,7 +86,13 @@ const LAYOUT_SCRIPT = `
     var next = Math.round(((parseFloat(input.value) || 0) + delta * step) * 100) / 100;
     next = Math.max(min, Math.min(max, next));
     input.value = next;
+    syncPackQtyHidden(form, input);
     form.requestSubmit();
+  }
+  function syncPackQtyHidden(form, input){
+    var sizeKg = parseFloat(input.getAttribute('data-size-kg')) || 1;
+    var hidden = form.querySelector('.ci-step__kg-hidden');
+    if (hidden) hidden.value = Math.round((parseFloat(input.value || '0') * sizeKg) * 1000) / 1000;
   }
 
   // Keep #cart-count's visual show/hide (CSS scale via .show) in sync
@@ -93,6 +109,41 @@ const LAYOUT_SCRIPT = `
       }
     }
   });
+
+
+    // ProductDetailPage's size picker: boxed variants, pick one to reveal
+  // its own AddToCartControl (pre-rendered per variant, just hidden —
+  // see ProductDetailPage.tsx for why), hide the others and the
+  // placeholder. Clicking "Add to Cart" before picking shows the red
+  // message instead of doing anything — pure frontend check, no request.
+  function selectDetailVariant(boxEl, variantId){
+    if (boxEl.disabled) return;
+    document.querySelectorAll('.variant-box').forEach(function(b){ b.classList.remove('on'); });
+    boxEl.classList.add('on');
+    var msg = document.getElementById('variant-required-msg');
+    if (msg) msg.style.display = 'none';
+    var placeholder = document.getElementById('variant-placeholder-addrow');
+    if (placeholder) placeholder.style.display = 'none';
+    document.querySelectorAll('[data-variant-wrap]').forEach(function(w){
+      w.style.display = (w.getAttribute('data-variant-wrap') === String(variantId)) ? '' : 'none';
+    });
+  }
+  function requireVariantSelection(){
+    var msg = document.getElementById('variant-required-msg');
+    if (msg) msg.style.display = 'block';
+  }
+
+    // Swipe for the fullscreen viewer — was ‹›-button-only before.
+  var viewerSwipeStartX = null;
+  document.getElementById('viewer') && document.getElementById('viewer').addEventListener('touchstart', function(e){
+    viewerSwipeStartX = e.touches[0].clientX;
+  }, { passive: true });
+  document.getElementById('viewer') && document.getElementById('viewer').addEventListener('touchend', function(e){
+    if (viewerSwipeStartX === null) return;
+    var dx = e.changedTouches[0].clientX - viewerSwipeStartX;
+    viewerSwipeStartX = null;
+    if (Math.abs(dx) > 40) viewerGo(dx < 0 ? 1 : -1);
+  }, { passive: true });
 
   // Clones imgEl (falls back to a 🌾 emoji span if there's no real image)
   // and animates it from originEl's position to the cart icon. Called
@@ -299,6 +350,337 @@ document.body.addEventListener('htmx:sendError', function(){
   } else {
     document.querySelectorAll('.reveal').forEach(function(el){ el.classList.add('vis'); });
   }
+
+
+(function () {
+  // one-time CSS, injected from JS
+  var st = document.createElement('style');
+  st.textContent =
+  '.plus.is-max{opacity:.5;cursor:not-allowed}' +
+  '.addrow,.pd-cart{position:relative}' +
+  '.max-msg{position:absolute;left:50%;bottom:calc(100% + 10px);transform:translateX(-50%);' +
+    'display:flex;align-items:center;gap:6px;background:#1f2937;color:#fff;' +
+    'font-size:12px;font-weight:600;line-height:1;padding:8px 12px;border-radius:10px;' +
+    'white-space:nowrap;z-index:50;pointer-events:none;' +
+    'box-shadow:0 8px 20px rgba(0,0,0,.25);animation:maxMsgIn .18s ease-out}' +
+  '.max-msg::before{content:"!";display:inline-flex;align-items:center;justify-content:center;' +
+    'width:16px;height:16px;border-radius:50%;background:#f59e0b;color:#1f2937;' +
+    'font-size:11px;font-weight:800}' +
+  '.max-msg::after{content:"";position:absolute;left:50%;top:100%;width:10px;height:10px;' +
+    'margin-top:-5px;background:#1f2937;border-radius:2px;transform:translateX(-50%) rotate(45deg)}' +
+  '.max-msg.out{opacity:0;transform:translateX(-50%) translateY(4px);transition:opacity .25s,transform .25s}' +
+  '@keyframes maxMsgIn{from{opacity:0;transform:translateX(-50%) translateY(6px)}' +
+    'to{opacity:1;transform:translateX(-50%) translateY(0)}}';
+
+    
+  document.head.appendChild(st);
+
+  // capture phase: runs before the inline onclick (fly animation) and before htmx submits
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.plus.is-max');
+    if (!btn) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    var row = btn.closest('.addrow, .pd-cart');
+    if (!row) return;
+
+    var old = row.querySelector('.max-msg');
+    if (old) { clearTimeout(old._t); old.remove(); }
+
+    var msg = document.createElement('div');
+    msg.className = 'max-msg';
+    msg.textContent = 'Only ' + btn.dataset.avail + ' available';
+    
+    row.appendChild(msg);
+
+    msg._t = setTimeout(function () {
+  msg.classList.add('out');
+  setTimeout(function () { msg.remove(); }, 250);
+}, 1800);
+     
+  }, true);
+})();
+
+
+
+// multiple clicks for stepper
+
+(function () {
+  var DEBOUNCE = 350; // ms of no clicking before the request is sent
+  var state = {};     // one entry per product, keyed by its adjust URL
+
+  function round(n) { return Math.round(n * 1e6) / 1e6; }
+
+  function paint(url, st) {
+    document.querySelectorAll('form[hx-post="' + url + '"]').forEach(function (f) {
+      var box = f.closest('.stepper, .pd-cart__stepper');
+      if (!box) return;
+      var b = box.querySelector('b');
+      var plus = box.querySelector('.plus');
+      if (b) b.textContent = st.shown;
+      if (plus) plus.classList.toggle('is-max', st.shown >= parseInt(plus.dataset.avail, 10));
+    });
+  }
+
+  function serverCount(url) {
+    var f = document.querySelector('form[hx-post="' + url + '"]');
+    var box = f && f.closest('.stepper, .pd-cart__stepper');
+    var b = box && box.querySelector('b');
+    return b ? (parseInt(b.textContent, 10) || 0) : 0;
+  }
+
+  function send(url) {
+    var st = state[url];
+    if (!st || st.busy) return;
+    if (st.kg === 0) { delete state[url]; return; } // + and - cancelled out
+
+    var kg = st.kg;
+    st.kg = 0;
+    st.packs = 0;
+    st.busy = true;
+
+    var done = function () {
+      // wait for htmx to finish swapping the fresh stepper in
+      setTimeout(function () {
+        st.busy = false;
+        if (st.kg !== 0) {
+          // clicks arrived while in flight: server count + those clicks
+          st.shown = serverCount(url) + st.packs;
+          paint(url, st);
+          send(url);
+        } else {
+          delete state[url];
+        }
+      }, 60);
+    };
+
+    htmx.ajax('POST', url, {
+      target: '#cart-count',
+      swap: 'innerHTML',
+      values: { delta: kg }
+    }).then(done, done);
+  }
+
+  // capture phase, so htmx never sees the individual submit clicks
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.stepper button, .pd-cart__stepper button');
+    if (!btn || btn.classList.contains('is-max')) return; // max message handles that
+
+    var form = btn.closest('form');
+    var url = form && form.getAttribute('hx-post');
+    if (!url || url.indexOf('/api/cart/adjust/') !== 0) return;
+
+    var input = form.querySelector('input[name="delta"]');
+    var kg = parseFloat(input.value);
+    var dir = kg > 0 ? 1 : -1;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    var box = btn.closest('.stepper, .pd-cart__stepper');
+    var st = state[url];
+    if (!st) {
+      st = state[url] = {
+        shown: parseInt(box.querySelector('b').textContent, 10) || 0,
+        kg: 0, packs: 0, timer: null, busy: false
+      };
+    }
+    if (dir < 0 && st.shown <= 0) return;
+
+    st.shown += dir;
+    st.kg = round(st.kg + kg);
+    st.packs += dir;
+
+    if (dir > 0 && btn.onclick) btn.onclick.call(btn, e); // keep the fly-to-cart animation
+    paint(url, st);
+
+    clearTimeout(st.timer);
+    st.timer = setTimeout(function () { send(url); }, DEBOUNCE);
+  }, true);
+})();
+
+// multiple click variant chips and cart row
+(function () {
+  var DEBOUNCE = 350;
+  function round(n) { return Math.round(n * 1e6) / 1e6; }
+
+  /* ---------- CART ROW STEPPER (.ci-step) ---------- */
+  var rows = {}; // keyed by the form's update URL
+
+  function rowForm(url) { return document.querySelector('form.ci-step[hx-post="' + url + '"]'); }
+
+  function paintRow(url, st) {
+    var f = rowForm(url);
+    if (!f) return;
+    var input = f.querySelector('.ci-step__input');
+    var hidden = f.querySelector('.ci-step__kg-hidden');
+    var plus = f.querySelectorAll('.ci-step__btn')[1];
+    input.value = st.target;
+    hidden.value = round(st.target * st.size);
+    if (plus) plus.disabled = st.target >= st.max;
+  }
+
+  function sendRow(url) {
+    var st = rows[url];
+    if (!st || st.busy) return;
+    var sent = st.target;
+    st.busy = true;
+
+    var done = function () {
+      setTimeout(function () {
+        st.busy = false;
+        if (st.target !== sent) {
+          paintRow(url, st); // clicks arrived in flight: re-apply on the fresh DOM
+          sendRow(url);
+        } else {
+          delete rows[url];
+        }
+      }, 60);
+    };
+
+    htmx.ajax('POST', url, {
+      target: '#cart-contents',
+      swap: 'outerHTML',
+      values: { quantityKg: round(sent * st.size) }
+    }).then(done, done);
+  }
+
+  // capture phase: also stops the inline bumpQty() from running
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.ci-step__btn');
+    if (!btn) return;
+    var form = btn.closest('form.ci-step');
+    var url = form && form.getAttribute('hx-post');
+    if (!url) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    var input = form.querySelector('.ci-step__input');
+    var dir = btn.textContent.trim() === '+' ? 1 : -1;
+    var st = rows[url];
+    if (!st) {
+      st = rows[url] = {
+        target: parseInt(input.value, 10) || 0,
+        size: parseFloat(input.dataset.sizeKg) || 1,
+        max: parseInt(input.max, 10) || 0,
+        timer: null,
+        busy: false
+      };
+    }
+    var next = st.target + dir;
+    if (next < 0 || next > st.max) return;
+    st.target = next;
+    paintRow(url, st);
+
+    clearTimeout(st.timer);
+    st.timer = setTimeout(function () { sendRow(url); }, DEBOUNCE);
+  }, true);
+
+  // typing a number submits immediately via the inline handler, so drop any pending batch
+  document.addEventListener('change', function (e) {
+    var input = e.target.closest && e.target.closest('.ci-step__input');
+    var form = input && input.form;
+    var url = form && form.getAttribute('hx-post');
+    if (url && rows[url]) { clearTimeout(rows[url].timer); delete rows[url]; }
+  });
+
+  /* ---------- VARIANT CHIPS (.variant-chip) ---------- */
+  var chips = {}; // keyed by the adjust URL
+
+  function chipFor(url) {
+    var f = document.querySelector('.variant-chip-row form[hx-post="' + url + '"]');
+    return f && f.querySelector('.variant-chip');
+  }
+
+  function paintChip(url, st) {
+    var chip = chipFor(url);
+    if (!chip) return;
+    var badge = chip.querySelector('.variant-chip__badge');
+    if (st.shown > 0 && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'variant-chip__badge';
+      chip.appendChild(badge);
+    }
+    if (badge) {
+      if (st.shown > 0) badge.textContent = st.shown;
+      else badge.remove();
+    }
+    chip.classList.toggle('has-qty', st.shown > 0);
+  }
+
+  function chipServerCount(url) {
+    var chip = chipFor(url);
+    var b = chip && chip.querySelector('.variant-chip__badge');
+    return b ? (parseInt(b.textContent, 10) || 0) : 0;
+  }
+
+  function sendChip(url) {
+    var st = chips[url];
+    if (!st || st.busy) return;
+    if (st.packs === 0) { delete chips[url]; return; }
+
+    var kg = round(st.packs * st.size);
+    st.packs = 0;
+    st.busy = true;
+
+    var done = function () {
+      setTimeout(function () {
+        st.busy = false;
+        if (st.packs !== 0) {
+          st.shown = chipServerCount(url) + st.packs;
+          paintChip(url, st);
+          sendChip(url);
+        } else {
+          delete chips[url];
+        }
+      }, 60);
+    };
+
+    htmx.ajax('POST', url, {
+      target: '#cart-count',
+      swap: 'innerHTML',
+      values: { delta: kg }
+    }).then(done, done);
+  }
+
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.variant-chip');
+    if (!btn || btn.disabled) return;
+    var form = btn.closest('form');
+    var url = form && form.getAttribute('hx-post');
+    if (!url) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    var avail = parseInt(btn.dataset.avail, 10) || 0;
+    var st = chips[url];
+    if (!st) {
+      var b = btn.querySelector('.variant-chip__badge');
+      st = chips[url] = {
+        shown: b ? (parseInt(b.textContent, 10) || 0) : 0,
+        size: parseFloat(form.querySelector('input[name="delta"]').value) || 1,
+        packs: 0, timer: null, busy: false
+      };
+    }
+    if (st.shown >= avail) return; // nothing left to add
+
+    st.shown += 1;
+    st.packs += 1;
+
+    if (btn.onclick) btn.onclick.call(btn, e); // keep fly-to-cart + toast
+    paintChip(url, st);
+
+    clearTimeout(st.timer);
+    st.timer = setTimeout(function () { sendChip(url); }, DEBOUNCE);
+  }, true);
+})();
+
+
+  
 `
 
 export const Layout: FC<LayoutProps> = ({
@@ -341,9 +723,9 @@ export const Layout: FC<LayoutProps> = ({
         <style>{`
           .hide-cart {
             display: none !important;
-            
+          
           }
-        `}</style>
+        `}</style> 
         
       </head>
       <body class={active ? `page-${active}` : undefined}>

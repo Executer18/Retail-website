@@ -38,7 +38,6 @@ export type HomeCategory = {
 
 
 
-
 const qcCards = [
   {
     href: '/products',
@@ -111,7 +110,7 @@ const subtitleStyle = `font-size: 12px; opacity: 0.85;`
 
 
 
-
+ 
 
 
 
@@ -128,9 +127,9 @@ const MILLING_STEPS = [
 // your real files. No .deco emoji here (unlike the mockup) — that's
 // meant to float over a flat color block, not a photo.
 const HERO_SLIDES = [
-  { src: '/hero/1.jpg', kicker: 'Fresh every morning', title: 'Stone-Ground Sharbati Atta', sub: 'Milled in front of you' },
-  { src: '/hero/2.jpg', kicker: 'Winter special', title: 'Millet Flours are Back', sub: 'Jowar · Bajra · Ragi — ground to order' },
-  { src: '/hero/3.jpg', kicker: 'Full transparency', title: 'Watch Your Grain Get Ground', sub: 'Live counter view · zero mixing guarantee' },
+  { src: '/hero-1.webp', kicker: 'Fresh every morning', title: 'Stone-Ground Sharbati Atta', sub: 'Milled in front of you' },
+  { src: '/hero-2.webp', kicker: 'Winter special', title: 'Millet Flours are Back', sub: 'Jowar · Bajra · Ragi — ground to order' },
+  { src: '/hero-3.webp', kicker: 'Full transparency', title: 'Watch Your Grain Get Ground', sub: 'Live counter view · zero mixing guarantee' },
 ]
 
 
@@ -341,7 +340,7 @@ export const HomePage: FC<{
         {featuredProducts.length > 0 ? (
           <div class="prodgrid">
             {featuredProducts.map((product) => (
-              <ProductCard product={product} currentQtyKg={cartQuantities[product.id] ?? 0} />
+              <ProductCard product={product} cartQuantities={cartQuantities} />
             ))}
           </div>
         ) : (

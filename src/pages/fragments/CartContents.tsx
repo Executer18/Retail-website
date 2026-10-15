@@ -19,6 +19,7 @@
 //     discountPct fields cart.tsx now computes from products.discount
 
 import type { FC } from 'hono/jsx'
+import { rupee, formatUnitPrice, toPackCount } from '../../lib/format'
 
 export type CartRow = {
   cartItemId: number
@@ -45,10 +46,6 @@ export type CartContentsProps = {
   totalSavings: number
 }
 
-export function rupee(n: number): string {
-  return '₹' + Math.round(n).toLocaleString('en-IN')
-}
-
 const BinIcon: FC = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M3 6h18" />
@@ -57,6 +54,12 @@ const BinIcon: FC = () => (
     <path d="M10 11v6M14 11v6" />
   </svg>
 )
+
+/** 0.05 → "50g", 0.5 → "500g", 2 → "2kg", 1.5 → "1.5kg" */
+const formatQty = (kg: number): string => {
+  if (kg < 1) return `${Math.round(kg * 1000)}g`
+  return `${Math.round(kg * 1000) / 1000}kg`
+}
 
 export const CartContents: FC<CartContentsProps> = ({ items, total, totalMrp, totalSavings }) => {
   if (items.length === 0) {
@@ -87,16 +90,19 @@ export const CartContents: FC<CartContentsProps> = ({ items, total, totalMrp, to
               </div>
 
               <div class="ci-mid">
-                <b>{item.name}</b>
+                <b>
+  {item.name}{' '} {' '}
+  <small style="font-weight:500;color:var(--color-muted)">· {formatQty(item.quantityKg)}</small>
+</b>
                 <span>
                   {item.discountPct > 0 ? (
                     <>
-                      <s style="color:var(--color-muted);margin-right:4px">{rupee(item.mrpPerKg)}</s>
-                      {rupee(item.pricePerKg)}/kg
+                      <s style="color:var(--color-muted);margin-right:4px">{formatUnitPrice(item.mrpPerKg, item.sizeKg)}</s>
+                      {formatUnitPrice(item.pricePerKg, item.sizeKg)}
                       <span class="save-tag">{item.discountPct}% OFF</span>
                     </>
                   ) : (
-                    <>{rupee(item.pricePerKg)}/kg</>
+                    <>{formatUnitPrice(item.pricePerKg, item.sizeKg)}</>
                   )}
                 </span>
 
@@ -106,19 +112,25 @@ export const CartContents: FC<CartContentsProps> = ({ items, total, totalMrp, to
                   hx-swap="outerHTML"
                   class="ci-step"
                 >
+                  {/* The server still expects quantityKg in actual kg — this
+                      hidden field is what's actually submitted, kept in sync
+                      with the visible pack-count input by bumpQty()/
+                      syncPackQtyHidden() in Layout.tsx. The visible input
+                      itself has no `name`, so it's never submitted directly. */}
+                  <input type="hidden" name="quantityKg" class="ci-step__kg-hidden" value={item.quantityKg} />
                   <button type="button" class="ci-step__btn" onclick="bumpQty(this,-1)" aria-label={`Decrease ${item.name} quantity`}>
                     −
                   </button>
                   <input
                     type="number"
-                    name="quantityKg"
-                    value={item.quantityKg}
+                    value={toPackCount(item.quantityKg, item.sizeKg)}
                     min="0"
-                    max={item.inStockKg}
-                    step={item.sizeKg}
+                    max={toPackCount(item.inStockKg, item.sizeKg)}
+                    step="1"
+                    data-size-kg={item.sizeKg}
                     class="ci-step__input"
-                    onchange="this.form.requestSubmit()"
-                    aria-label={`${item.name} quantity in kg`}
+                    onchange="syncPackQtyHidden(this.form, this);this.form.requestSubmit()"
+                    aria-label={`${item.name} quantity`}
                   />
                   <button
                     type="button"
@@ -161,7 +173,7 @@ export const CartContents: FC<CartContentsProps> = ({ items, total, totalMrp, to
         </div>
         <div class="row save">
           <span>Discount on MRP</span>
-          <b>− {rupee(totalSavings)}</b>
+          <b>− {rupee(totalSavings)}</b> 
         </div>
         <div class="row">
           <span>Store pickup</span>
@@ -179,3 +191,6 @@ export const CartContents: FC<CartContentsProps> = ({ items, total, totalMrp, to
     </div>
   )
 }
+
+
+

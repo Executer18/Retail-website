@@ -31,7 +31,317 @@
   --nav-h:64px;
 }
 
+/* ==========================================================================
+   Round 2 additions — append to the end of utility.css (after the
+   existing cart-ui-additions / home-ui-additions / product-detail-ui-
+   additions blocks). The old .size-badge ("+N") rule from
+   home-ui-additions.css is unused now (replaced by the chip row below)
+   — harmless to leave in place, not worth hunting down and deleting.
+   ========================================================================== */
 
+.pd-suggest { 
+  margin: 20px 0 4px; 
+  width: 100%; /* Ensures the container takes full available width */
+  box-sizing: border-box;
+}
+
+.pd-suggest h4 { 
+  font-size: 14px; 
+  font-weight: 800; 
+  color: var(--color-ink); 
+  margin-bottom: 10px; 
+  padding: 0 14px; 
+}
+
+.pd-suggest-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 0 14px 4px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.pd-suggest-row::-webkit-scrollbar { display: none; }
+
+.pd-suggest .pd-suggest-row > .pcard {
+  flex: 0 0 140px;
+  width: 140px;
+  min-width: 140px;
+  max-width: 140px;
+  overflow: hidden;
+}
+
+/* ===== Product detail page: add-to-cart button / stepper + size badge =====
+   Append to the end of utility.css. All new class names, so nothing here
+   conflicts with your existing .addrow / .addbtn / .stepper rules. */
+ 
+.pd-cart {
+  margin: 10px 0 14px;
+}
+.pd-cart form {
+  margin: 0;
+}
+
+/* "Add to Cart" — full width, same crimson as the rest of the site */
+.pd-cart__add {
+  width: 40%;
+  height: 35px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-soft, 12px);
+  background: var(--color-primary, #e81e57);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .2px;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(232, 30, 87, .25);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .12s ease, background-color .15s ease;
+}
+.pd-cart__add:not(:disabled):active {
+  transform: scale(.98);
+  background: var(--color-primary-dark, #b8123f);
+}
+.pd-cart__add:disabled {
+  background: #d6d0c8;
+  color: #fff;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* Stepper:  [ − ]   2   [ + ] */
+.pd-cart__stepper {
+  height: 35px;
+  width: 40%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px;
+  border-radius: var(--radius-soft, 12px);
+  background: var(--color-primary, #e81e57);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(232, 30, 87, .25);
+}
+.pd-cart__stepper form {
+  flex: none;
+  display: flex;
+}
+.pd-cart__stepper button {
+  width: 44px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #fff;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.pd-cart__stepper button:not(:disabled):active {
+  background: rgba(255, 255, 255, .22);
+}
+.pd-cart__stepper button:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+.pd-cart__qty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.1;
+}
+.pd-cart__qty b {
+  font-size: 18px;
+  font-weight: 800;
+}
+.pd-cart__qty small {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: .9;
+}
+
+/* Count bubble on a size box (top-right corner, inside the box so the
+   scrolling .variant-box-row never clips it). Hidden when empty. */
+.variant-box {
+  position: relative;
+  flex: none;
+  min-width: 84px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 14px;
+  border-radius: var(--radius-soft);
+  border: 1.5px solid var(--color-border);
+  background: var(--color-surface);
+  font-family: inherit;
+}
+
+.variant-box__badge {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--color-primary, #e81e57);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+.variant-box__badge:empty {
+  display: none;
+}
+
+/* Secondary muted unit-price line under a card's main pack price. */
+.unit-price {
+  font-size: 10.5px;
+  color: var(--color-muted);
+  margin-top: -2px;
+  margin-bottom: 4px;
+}
+.pd-unit-price {
+  font-size: 12px;
+  color: var(--color-muted);
+  font-weight: 600;
+  margin-left: 2px;
+}
+
+/* ---------- Product card: inline size chips (replaces the old
+   "SELECT SIZE" popup trigger + "+N" badge) ---------- */
+.variant-chip-row {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+  margin-top: 2px;
+}
+.variant-chip-row::-webkit-scrollbar {
+  display: none;
+}
+.variant-chip-row form {
+  flex: none;
+}
+.variant-chip {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 5px 9px;
+  border-radius: var(--radius-soft);
+  border: 1.5px solid var(--color-border);
+  background: var(--color-surface);
+  font-family: inherit;
+  white-space: nowrap;
+}
+.variant-chip__size {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--color-ink);
+}
+.variant-chip__price {
+  font-size: 9.5px;
+  color: var(--color-muted);
+}
+.variant-chip.has-qty {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+.variant-chip__badge {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 7px;
+  font-weight: 800;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  padding: 0 3px;
+}
+.variant-chip:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* ---------- Product detail page: boxed variant selection ---------- */
+.variant-box-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 10px 0;
+}
+.variant-box-row::-webkit-scrollbar {
+  display: none;
+}
+
+.variant-box__size {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--color-ink);
+}
+.variant-box__price {
+  font-size: 11.5px;
+  color: var(--color-muted);
+}
+.variant-box.on {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
+.variant-box--disabled,
+.variant-box:disabled {
+  opacity: 0.45;
+}
+.variant-box__oos {
+  font-size: 9.5px;
+  color: var(--color-ink);
+  font-weight: 700;
+}
+.variant-required-msg {
+  color: #d92d20;
+  font-size: 12.5px;
+  font-weight: 700;
+  margin: -4px 0 10px;
+}
+
+/* Belt-and-suspenders: the gallery track must never show more than one
+   slide's width at a time, and a suggestion card's own content (e.g. a
+   wide chip row, if that suggested product also has multiple sizes)
+   must never force the card wider than the fixed 140px it's given. */
+.pd-gallery {
+  overflow: hidden;
+  border-radius: 10px;
+}
+.pd-suggest-row .pcard {
+  overflow: hidden;
+}
 
 /* extra added css for  bugs */
 /* 1. Fade out the full card uniformly when out of stock */
@@ -70,18 +380,11 @@
   text-overflow: ellipsis !important;
 }
 
-
-
-
-
-
-
-
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{scroll-behavior:smooth}
 body{
   font-family:var(--font-body);background:var(--color-bg);color:var(--color-body);
-  padding-bottom:calc(var(--nav-h) + 20px);overflow-x:hidden;
+  padding-bottom:calc(var(--nav-h) + 10px);overflow-x:hidden;
 }
 img{max-width:100%; display:block}
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
@@ -120,7 +423,7 @@ h1,h2,h3,h4{color:var(--color-ink)}
 .catstrip::-webkit-scrollbar{display:none}
 .catpill{display:flex;flex-direction:column;align-items:center;gap:6px;flex:none;width:64px}
 .catpill .ic{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;font-size:26px;
-  backgrond:var(--color-surface);border:1.5px solid var(--color-border);box-shadow:var(--shadow-sm);
+             background:var(--color-surface);border:1.5px solid var(--color-border);box-shadow:var(--shadow-sm);
   transition:transform var(--duration-base), border-color var(--duration-base)}
 .catpill:active .ic{transform:scale(.92)}
 .catpill span{font-size:11px;font-weight:600;color:var(--color-muted);text-align:center;line-height:1.2}
@@ -169,12 +472,12 @@ h1,h2,h3,h4{color:var(--color-ink)}
 @keyframes rise{from{opacity:0;transform:translateY(14px)}}
 
 /* ---------- Product cards ---------- */
-.prodgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px}
+.prodgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px; margin: 10px;} 
 .pcard{background:var(--color-surface);border-radius:var(--radius-soft);border:1.5px solid var(--color-border);overflow:visible;
   box-shadow:var(--shadow-sm);position:relative;transition:transform var(--duration-base), box-shadow var(--duration-base);
   animation:rise .45s backwards}
 .pcard:hover{transform:translateY(-3px);box-shadow:var(--shadow-md)}
-.pcard .img{height:100px;display:grid;place-items:center;font-size:44px;position:relative;overflow: hidden;}
+.pcard .img{height:100px;display:grid;place-items:center;font-size:44px;position:relative;overflow: hidden; border-radius: 12px 12px 0 0;}
 .pcard .off{position:absolute;top:6px;left:6px;background:var(--color-success);color:#fff;font-size:9.5px;
   font-weight:800;padding:2px 6px;border-radius:var(--radius-crisp)}
 .pcard .body{padding:8px 9px 10px}
@@ -206,10 +509,10 @@ h1,h2,h3,h4{color:var(--color-ink)}
   justify-content:center;
   background:var(--color-primary);
   color:#fff;
-  font-size:18px;           /* works for "+" or "ADD" text */
+  font-size:12px;           /* works for "+" or "ADD" text */
   font-weight:800;
   line-height:1;
-  padding:0 8px;
+  padding:5px 7px;
   border:none;
   border-radius:8px;
   letter-spacing:0;
@@ -259,32 +562,14 @@ h1,h2,h3,h4{color:var(--color-ink)}
 }
 
 /* ===== Out of stock ===== */
-.pcard.out-of-stock{
-  opacity:.55;
-  filter:grayscale(20%);
-  pointer-events:none;
-}
+
 .pcard.out-of-stock .stepper{display:none}
-.pcard.out-of-stock .addbtn{
-  display:flex;
-  background:#f3f4f6;
-  color:#6b7280;
-  font-size:11px;
-  font-weight:700;
-  text-transform:uppercase;
-  letter-spacing:.5px;
-  box-shadow:none;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
 
 /* ===== Animations ===== */
 @keyframes stepIn{from{transform:scale(.7) translateY(6px);opacity:0}}
 
 .qty-bump{animation:bump .3s cubic-bezier(.34,1.8,.5,1)}
 @keyframes bump{40%{transform:scale(1.35)}}
-
 
 /* ---------- CTA duo ---------- */
 .cta-duo{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -330,7 +615,7 @@ h1,h2,h3,h4{color:var(--color-ink)}
   backdrop-filter:blur(4px);transition:transform .5s cubic-bezier(.34,1.6,.5,1), background .4s;transform:scale(0)}
 .step b{font-size:14px;display:block}
 .step p{font-size:12px;opacity:.85;margin-top:2px;line-height:1.45}
-.step{opacity:0;transform:translateX(-18px)}
+
 .info-sec.vis-anim .step{opacity:1;transform:none;
   transition:opacity .55s var(--ease), transform .55s var(--ease);transition-delay:calc(.25s + var(--i)*.22s)}
 .info-sec.vis-anim .step .n{transform:scale(1);
@@ -557,7 +842,7 @@ h1,h2,h3,h4{color:var(--color-ink)}
     "img  name  step  price"
     "img  meta  step  remove"
     "warn warn  warn  warn";
-  grid-template-rows:auto auto auto;
+  grid-template-rows:auto auto auto; 
   column-gap:10px;
   row-gap:0;
   align-items:center;
@@ -917,7 +1202,7 @@ h1,h2,h3,h4{color:var(--color-ink)}
 .v-close:active,.v-nav:active{background:rgba(255,255,255,.25)}
 
 /* ---------- Product detail page ---------- */
-.pd-gallery{margin:0;position:relative}
+
 .pd-track{display:flex;transition:transform .45s var(--ease);touch-action:pan-y}
 .pd-slide{min-width:100%;height:300px;display:grid;place-items:center;font-size:120px;cursor:zoom-in}
 .pd-slide.zoom{font-size:150px}
@@ -959,54 +1244,6 @@ h1,h2,h3,h4{color:var(--color-ink)}
 .pd-off{position:absolute;top:14px;left:14px;background:var(--color-success);color:#fff;font-size:11px;
   font-weight:800;padding:4px 9px;border-radius:var(--radius-crisp);z-index:2}
 
-/* ---------- Checkout ---------- */
-.co-sec{margin:14px;background:var(--color-surface);border:1.5px solid var(--color-border);
-  border-radius:var(--radius-soft);padding:16px}
-.co-sec h4{font-size:13px;font-weight:800;color:v      �  �  �  ��j�Z[j�Y�m:12px;
-  text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:7px}
-.slotgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.slot{padding:9px 4px;text-align:center;font-size:11.5px;font-weight:700;border:1.5px solid var(--color-border);
-  border-radius:var(--radius-crisp);color:var(--color-body);transition:all var(--duration-base)}
-.slot.on{background:var(--color-primary);border-color:var(--color-primary);color:#fff}
-.map-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;
-  border:1.5px solid var(--color-border);border-radius:var(--radius-crisp);font-weight:700;font-size:13px;
-  color:var(--color-ink);background:var(--color-gold-light);transition:transform var(--duration-fast)}
-.map-btn:active{transform:scale(.97)}
-.co-place{position:fixed;left:0;right:0;bottom:var(--nav-h);z-index:54;background:var(--color-surface);
-  border-top:1.5px solid var(--color-border);padding:10px 14px}
-.co-place button{width:100%;background:var(--color-primary);color:#fff;padding:14px;border-radius:var(--radius-crisp);
-  font-weight:800;font-size:14px;letter-spacing:.04em}
-.mini-row{display:flex;align-items:center;gap:10px;padding:7px 0;font-size:13px}
-.mini-row .mi{width:36px;height:36px;flex:none;border-radius:8px;display:grid;place-items:center;font-size:19px}
-.mini-row b{color:var(--color-ink)}
-.mini-row .q{margin-left:auto;font-weight:700;color:var(--color-muted);font-size:12px}
-
-/* ---------- Confirmation ---------- */
-.conf-hero{text-align:center;padding:40px 20px 18px}
-.conf-tick{width:78px;height:78px;margin:0 auto 14px;border-radius:50%;background:var(--color-success-bg);
-  display:grid;place-items:center;animation:tickIn .6s cubic-bezier(.34,1.6,.5,1)}
-@keyframes tickIn{from{transform:scale(0) rotate(-30deg)}}
-.conf-tick svg{stroke:var(--color-success);stroke-width:3;fill:none;stroke-linecap:round;stroke-linejoin:round;
-  stroke-dasharray:40;stroke-dashoffset:40;animation:draw .5s .3s forwards}
-@keyframes draw{to{stroke-dashoffset:0}}
-.conf-hero h1{font-size:22px;font-weight:800;color:var(--color-ink)}
-.conf-hero p{font-size:13px;color:var(--color-muted);margin-top:5px}
-
-/* ---------- Orders list / detail ---------- */
-.order-card{display:block;background:var(--color-surface);border:1.5px solid var(--color-border);
-  border-radius:var(--radius-soft);padding:14px;margin:0 14px 10px;box-shadow:var(--shadow-sm);
-  transition:transform var(--duration-base);animation:rise .4s backwards}
-.order-card:active{transform:scale(.98)}
-.order-card .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-.order-card .top b{font-size:13px;color:var(--color-ink)}
-.status-pill{font-size:10px;font-weight:800;padding:3px 10px;border-radius:var(--radius-round);
-  background:var(--color-success-bg);color:var(--color-success);text-transform:uppercase;letter-spacing:.05em}
-.status-pill.wait{background:var(--color-warning-bg,#fef3c7);color:var(--color-warning,#b45309)}
-.order-card .mid{font-size:12px;color:var(--color-muted);display:flex;gap:6px;flex-wrap:wrap}
-.order-card .bot{display:flex;justify-content:space-between;margin-top:8px;padding-top:8px;
-  border-top:1px dashed var(--color-border);font-size:12.5px}
-.order-card .bot b{color:var(--color-ink)}
-
 /* ---------- Search page: sidebar + grid ---------- */
 .search-layout{display:flex;gap:0;align-items:flex-start}
 .search-side{position:sticky;top:118px;width:96px;flex:none;display:flex;flex-direction:column;gap:4px;
@@ -1019,60 +1256,12 @@ h1,h2,h3,h4{color:var(--color-ink)}
 .search-main{flex:1;padding:10px 12px 10px 4px;min-width:0}
 .search-main .prodgrid{grid-template-columns:repeat(auto-fill,minmax(105px,1fr))}
 
-/* ---------- Account ---------- */
-.acct-head{margin:14px;background:var(--color-surface);border:1.5px solid var(--color-border);
-  border-radius:var(--radius-soft);padding:18px;display:flex;align-items:center;gap:14px}
-.acct-avatar{width:58px;height:58px;flex:none;border-radius:50%;background:var(--color-primary-light);
-  display:grid;place-items:center;font-size:24px;font-weight:800;color:var(--color-primary-dark)}
-.acct-head b{font-size:16px;color:var(--color-ink);display:block}
-.acct-head span{font-size:12px;color:var(--color-muted)}
-.acct-head .edit{margin-left:auto;font-size:12px;font-weight:800;color:var(--color-primary);
-  border:1.5px solid var(--color-primary);padding:7px 14px;border-radius:var(--radius-round)}
-.menu-list{margin:0 14px;background:var(--color-surface);border:1.5px solid var(--color-border);
-  border-radius:var(--radius-soft);overflow:hidden}
-.menu-item{display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;font-size:13.5px;
-  font-weight:600;color:var(--color-ink);border-bottom:1px solid var(--color-border);text-align:left}
-.menu-item:last-child{border-bottom:none}
-.menu-item .em{font-size:18px}
-.menu-item .arr{margin-left:auto;color:var(--color-muted)}
-.auth-btns{display:flex;gap:10px;margin:14px}
-.auth-btns button{flex:1;padding:13px;border-radius:var(--radius-crisp);font-weight:800;font-size:13.5px}
-.auth-btns .login{background:var(--color-primary);color:#fff}
-.auth-btns .signup{border:1.5px solid var(--color-primary);color:var(--color-primary)}
-.auth-alt{text-align:center;font-size:12.5px;color:var(--color-muted);margin-top:12px}
-.auth-alt b{color:var(--color-primary);cursor:pointer}
-
-/* ---------- Contact ---------- */
-.contact-hero{margin:14px;background:var(--color-surface);border:1.5px solid var(--color-border);
-  border-radius:var(--radius-soft);padding:18px;text-align:center}
-.contact-hero .em{font-size:44px}
-.contact-hero h3{font-size:18px;margin:6px 0 2px}
-.contact-hero p{font-size:12.5px;color:var(--color-muted)}
-.contact-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 14px 14px}
-.cbtn{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;border-radius:var(--radius-crisp);
-  font-weight:800;font-size:13px;color:#fff;transition:transform var(--duration-fast)}
-.cbtn:active{transform:scale(.96)}
-.cbtn.wa{background:#1faa53}
-.cbtn.em{background:var(--color-primary)}
-.faq{margin:0 14px 14px}
-.faq details{background:var(--color-surface);border:1.5px solid var(--color-border);border-radius:var(--radius-soft);
-  margin-bottom:8px;overflow:hidden}
-.faq summary{padding:13px 15px;font-size:13px;font-weight:700;color:var(--color-ink);cursor:pointer;
-  list-style:none;display:flex;justify-content:space-between;align-items:center}
-.faq summary::after{content:'+';font-size:17px;color:var(--color-primary);transition:transform .25s}
-.faq details[open] summary::after{transform:rotate(45deg)}
-.faq details p{padding:0 15px 13px;font-size:12.5px;color:var(--color-body);line-height:1.6}
-.map-embed{margin:0 14px 16px;border-radius:var(--radius-soft);overflow:hidden;border:1.5px solid var(--color-border)}
-.map-embed iframe{width:100%;height:220px;border:0;display:block}
-
 /* bottom padding for pages with fixed buy bar */
 .has-buybar{padding-bottom:calc(var(--nav-h) + 84px)}
 
 @media(max-width:649px){
   .pin-sticky{padding:16px 16px}
 }
-
-
 
 /* ==========================================================================
    Cart integration additions — NOT part of the original Annapurna Chakki
@@ -1099,14 +1288,10 @@ h1,h2,h3,h4{color:var(--color-ink)}
 /* .cart-item needs position:relative so .ci-remove can pin to its
    top-right corner; add a little right padding so the bin icon never
    sits on top of the price. */
-.cart-item {
-  position: relative;
-  padding-right: 30px;
-}
 
 /* Bin-icon-only remove button, top-right corner of the row. */
 .ci-remove {
-  position: absolute;
+  position: static;
   top: 6px;
   right: 6px;
   width: 22px;
@@ -1127,10 +1312,7 @@ h1,h2,h3,h4{color:var(--color-ink)}
 /* "− [editable input] +" qty stepper — same visual language as the
    mockup's .ci-step (pill, primary-light background) but with a real
    <input> in place of the static <b>. */
-.cart-item .ci-step {
-  margin-top: 6px;
-  width: fit-content;
-}
+
 .ci-step__btn {
   width: 26px;
   height: 26px;
@@ -1181,11 +1363,6 @@ h1,h2,h3,h4{color:var(--color-ink)}
   margin-left: 6px;
 }
 
-
-
-
-
-
 /* ==========================================================================
    Home / ProductCard integration additions — NOT part of the original
    mockup. Append this to the end of styles.css, after
@@ -1223,9 +1400,6 @@ h1,h2,h3,h4{color:var(--color-ink)}
 /* "What would you like to do?" — 3 cards, horizontally scrollable
    instead of the mockup's fixed 2-column grid. */
 
-
-
-
 .cta-row {
   display: flex;
   gap: 12px;
@@ -1263,9 +1437,7 @@ h1,h2,h3,h4{color:var(--color-ink)}
    flat color block; over an actual photo it just looks like something
    broken floating on top). HomePage.tsx doesn't render .deco in the
    hero anymore for this reason. */
-.slide .bg {
-  background: var(--color-ink);
-}
+
 .slide .bg img {
   width: 100%;
   height: 100%;
@@ -1361,13 +1533,6 @@ h1,h2,h3,h4{color:var(--color-ink)}
     width: 84%;
   }
 }
-
-
-
-
-
-
-
 
 /* ==========================================================================
    Home / ProductCard integration additions — NOT part of the original
@@ -1377,62 +1542,14 @@ h1,h2,h3,h4{color:var(--color-ink)}
 
 /* Real product image inside .pcard .img — same box size as the mockup
    (92px tall, full card width), clipped so it can't overflow. */
-.pcard .img img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.pcard.out-of-stock {
-  opacity: 0.55;
-}
-.pcard.out-of-stock .img img,
-.pcard.out-of-stock .img span {
-  filter: grayscale(0.6);
-}
 
 /* "+N" size-variant badge next to the weight line. */
-.size-badge {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--color-primary-light);
-  color: var(--color-primary-dark);
-  font-size: 9.5px;
-  font-weight: 800;
-  vertical-align: middle;
-}
 
 /* "What would you like to do?" — 3 cards, horizontally scrollable
    instead of the mockup's fixed 2-column grid. */
-.cta-row {
-  display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  scroll-snap-type: x proximity;
-  scrollbar-width: none;
-}
-.cta-row::-webkit-scrollbar {
-  display: none;
-}
-.cta-row .cta-big {
-  flex: none;
-  width: 72%;
-  max-width: 230px;
-  scroll-snap-align: start;
-  border: none;
-  cursor: pointer;
-  font-family: inherit;
-}
-.cta-c {
-  background: linear-gradient(135deg, var(--color-success), #1f6a46);
-}
+
 @media (min-width: 560px) {
-  .cta-row .cta-big {
-    width: 31%;
-  }
+  
 }
 
 /* Real-photo hero slides — the mockup's .slide .bg was a flat CSS
@@ -1443,106 +1560,23 @@ h1,h2,h3,h4{color:var(--color-ink)}
    flat color block; over an actual photo it just looks like something
    broken floating on top). HomePage.tsx doesn't render .deco in the
    hero anymore for this reason. */
-.slide .bg {
-  background: var(--color-ink);
-}
-.slide .bg img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.slide .bg::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 55%;
-  background: linear-gradient(0deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
-}
 
 /* Size-variant picker rows (products.ts' /api/products/:id/variants),
    shown inside Layout's shared #variantModal. */
-.variant-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.variant-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-soft);
-}
-.variant-row__size {
-  font-weight: 700;
-  font-size: 13px;
-  color: var(--color-ink);
-  flex: 1;
-}
-.variant-row__price {
-  font-size: 12.5px;
-  color: var(--color-muted);
-}
-.variant-row__price small {
-  color: var(--color-primary);
-  font-weight: 700;
-}
-.variant-row__add {
-  width: 30px;
-  height: 30px;
-  flex: none;
-  border-radius: 50%;
-  background: var(--color-primary);
-  color: #fff;
-  font-size: 17px;
-  font-weight: 800;
-  display: grid;
-  place-items: center;
-}
-.variant-row__add:disabled {
-  background: var(--color-border);
-  color: var(--color-muted);
-  pointer-events: none;
-}
 
 /* ---------- Responsiveness pass ----------
    The mockup is already mobile-first; these widen things gracefully on
    larger screens instead of letting the single mobile column stretch
    edge-to-edge. */
 @media (min-width: 720px) {
-  body {
-    max-width: 640px;
-    margin: 0 auto;
-    box-shadow: 0 0 40px rgba(0, 0, 0, 0.05);
-  }
-  .bottomnav,
-  .floatcart {
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
-    width: 100%;
-    max-width: 640px;
-  }
-  .floatcart.show {
-    /* base rule's .show transform (translateY) would otherwise clobber
-       the centering transform above */
-    transform: translateX(-50%) translateY(0);
-  }
+  
+  
+  
 }
 @media (max-width: 360px) {
-  .catgrid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .cta-row .cta-big {
-    width: 84%;
-  }
+  
+  
 }
-
-
 
 /* ==========================================================================
    Product detail popup additions — NOT part of the original mockup
@@ -1562,11 +1596,7 @@ h1,h2,h3,h4{color:var(--color-ink)}
    height:300px — a square box that never distorts regardless of the
    source photo's own aspect ratio. Numbered .pd-dot styling is already
    in utility.css and needs no changes. */
-.pd-slide {
-  height: auto;
-  aspect-ratio: 1 / 1;
-  font-size: 0; /* was sized for a centered emoji glyph; no longer needed */
-}
+
 .pd-slide img {
   width: 100%;
   height: 100%;
@@ -1594,27 +1624,4 @@ h1,h2,h3,h4{color:var(--color-ink)}
 
 /* "More in this category" / "You might also like" — a horizontal row of
    the same .pcard used on the grid, just scrollable instead of wrapping. */
-.pd-suggest {
-  margin: 20px 0 4px;
-}
-.pd-suggest h4 {
-  font-size: 14px;
-  font-weight: 800;
-  color: var(--color-ink);
-  margin-bottom: 10px;
-  padding: 0 14px;
-}
-.pd-suggest-row {
-  display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  padding: 0 14px 4px;
-  scrollbar-width: none;
-}
-.pd-suggest-row::-webkit-scrollbar {
-  display: none;
-}
-.pd-suggest-row .pcard {
-  flex: none;
-  width: 140px;
-}
+

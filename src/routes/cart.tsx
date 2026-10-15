@@ -25,10 +25,12 @@ import { eq, and } from 'drizzle-orm'
 import { getDB } from '../db'
 import { cartItems, products } from '../db/schema'
 import type { Env, Variables } from '../db'
-import { CartContents, rupee, type CartRow } from '../pages/fragments/CartContents'
+import { CartContents, type CartRow } from '../pages/fragments/CartContents'
 import { CartPage } from '../pages/CartPage'
-import { ProductCard, AddToCartControl } from '../components/ProductCard'
+import { ProductCard } from '../components/ProductCard'
 import { groupBySizeVariants } from '../lib/product-variants'
+import { rupee, toPackCount } from '../lib/format'
+import { DetailCartControl, DetailVariantBadge } from '../components/DetailCartControl'
 
 export const cartRoutes = new Hono<{ Bindings: Env; Variables: Variables }>()
 
@@ -108,45 +110,39 @@ function cartTrigger(warningMessage?: string) {
   })
 }
 
-// Shared by /api/cart/adjust, /update and /remove: rebuilds whichever
-// card the change affects as an out-of-band swap (id={`pcard-${id}`}).
-// Without this, only the adjust route kept a ProductCard in sync — the
-// cart page/modal's own update+remove routes left the grid showing
-// stale ADD/stepper state until a full reload.
-async function renderCardOob(db: ReturnType<typeof getDB>, productId: number, nextQty: number) {
+
+
+// Shared by /api/cart/adjust, /update and /remove. After any cart change it
+// returns THREE independent out-of-band swaps:
+//   1. pcard-{familyPrimaryId}  — the whole grid card, rebuilt with the full
+//      family and a FRESH cartQuantities map.
+//   2. pd-addrow-{variantId}    — ProductDetailPage's add button / stepper
+//      for the exact variant that changed.
+//   3. pd-vbadge-{variantId}    — the count bubble on that variant's size
+//      box in ProductDetailPage.
+// Whichever of these isn't on the current page is a harmless no-op.
+async function renderCardOob(db: ReturnType<typeof getDB>, sessionId: string, productId: number, nextQty: number) {
   const [product] = await db.select().from(products).where(eq(products.productId, productId))
   if (!product) return null
-
+ 
   const siblings = await db.select().from(products).where(eq(products.itemName, product.itemName))
   const [family] = groupBySizeVariants(siblings)
   const clickedVariant = family?.variants.find((v) => v.id === productId)
   if (!family || !clickedVariant) return null
-
-  const cardForClicked = {
-    ...family,
-    id: clickedVariant.id,
-    pricePerKg: clickedVariant.pricePerKg,
-    inStockKg: clickedVariant.inStockKg,
-    discountPct: clickedVariant.discountPct,
-  }
-
-  // Two independent OOB targets, not one: id="pcard-{id}" matches a grid
-  // card if one's on the page, id="addrow-{id}" matches ProductDetailPage's
-  // standalone inline control if THAT's on the page instead (or as well —
-  // the grid can sit behind an open detail sheet). Whichever doesn't
-  // exist on the current page is just a no-op swap, same as before.
+ 
+  const freshCartQuantities = await getCartQuantities(db, sessionId)
+ 
   return (
     <>
-      <ProductCard product={cardForClicked} currentQtyKg={nextQty} oob />
-      <AddToCartControl
-        product={cardForClicked}
-        currentQtyKg={nextQty}
-        oob
-        flyOriginExpr="document.getElementById('pd-main-img-wrap')"
-      />
+      <ProductCard product={family} cartQuantities={freshCartQuantities} oob />
+      <DetailCartControl variant={clickedVariant} qtyKg={nextQty} oob />
+      <DetailVariantBadge variant={clickedVariant} qtyKg={nextQty} oob />
     </>
   )
 }
+
+
+
 
 // ---------- Add to cart ----------
 cartRoutes.post('/api/cart/add/:productId', async (c) => {
@@ -239,7 +235,7 @@ cartRoutes.post('/api/cart/adjust/:productId', async (c) => {
     await db.insert(cartItems).values({ sessionId, productId, quantityKg: nextQty })
   }
 
-  const cardOob = await renderCardOob(db, productId, nextQty)
+  const cardOob = await renderCardOob(db, sessionId, productId, nextQty)
   const { items } = await loadCartWithProducts(db, sessionId)
   const itemCount = items.length
 
@@ -273,12 +269,15 @@ cartRoutes.get('/api/cart/summary', async (c) => {
   const sessionId = c.get('sessionId')
   const { items, total } = await loadCartWithProducts(db, sessionId)
   const show = items.length > 0
-
+  // Sum of PACKS across every line, not kilograms — "3 items" should
+  // mean 3 packs tapped in, same unit the stepper counts in, not a raw
+  // kg total that means something different for every size.
+  const totalPacks = items.length
   return c.html(`
     <button class="floatcart${show ? ' show' : ''}" id="floatcart" type="button" onclick="openSheet('cartModal')">
       <span class="fc-left">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.6 12.5h11L21 7H6"/></svg>
-        <span><b>View Cart</b><small class="ftot">${rupee(total)}</small></span>
+        <span><b>View Cart · ${totalPacks} item${totalPacks !== 1 ? 's' : ''}</b><small class="ftot">${rupee(total)}</small></span>
       </span>
       <span class="fc-view">View →</span>
     </button>
@@ -315,7 +314,7 @@ cartRoutes.post('/api/cart/update/:cartItemId', async (c) => {
 
   if (requestedKg <= 0) {
     await db.delete(cartItems).where(and(eq(cartItems.cartItemId, cartItemId), eq(cartItems.sessionId, sessionId)))
-    if (row) cardOob = await renderCardOob(db, row.productId, 0)
+    if (row) cardOob = await renderCardOob(db, sessionId, row.productId, 0)
   } else if (row) {
     const [product] = await db.select().from(products).where(eq(products.productId, row.productId))
     const maxKg = product?.inStockKg ?? requestedKg
@@ -327,7 +326,7 @@ cartRoutes.post('/api/cart/update/:cartItemId', async (c) => {
       .set({ quantityKg: clampedKg })
       .where(and(eq(cartItems.cartItemId, cartItemId), eq(cartItems.sessionId, sessionId)))
 
-    cardOob = await renderCardOob(db, row.productId, clampedKg)
+    cardOob = await renderCardOob(db, sessionId, row.productId, clampedKg)
   }
 
   const { items, total, totalMrp, totalSavings } = await loadCartWithProducts(db, sessionId)
@@ -360,7 +359,7 @@ cartRoutes.post('/api/cart/remove/:cartItemId', async (c) => {
 
   await db.delete(cartItems).where(and(eq(cartItems.cartItemId, cartItemId), eq(cartItems.sessionId, sessionId)))
 
-  const cardOob = row ? await renderCardOob(db, row.productId, 0) : null
+  const cardOob = row ? await renderCardOob(db, sessionId, row.productId, 0) : null
   const { items, total, totalMrp, totalSavings } = await loadCartWithProducts(db, sessionId)
   c.header('HX-Trigger', cartTrigger())
   return c.html(
