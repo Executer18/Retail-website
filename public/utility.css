@@ -449,7 +449,7 @@ h1,h2,h3,h4{color:var(--color-ink)}
 .hero-dot i{display:block;height:100%;width:0;background:#fff;border-radius:var(--radius-round)}
 .hero-dot.on i{animation:dotfill 4.5s linear forwards}
 @keyframes dotfill{to{width:100%}}
-
+ 
 /* ---------- Section headers ---------- */
 .sec{padding:18px 14px 4px}
 .sec-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px}

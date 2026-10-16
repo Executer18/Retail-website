@@ -31,7 +31,9 @@ type LayoutProps = PropsWithChildren<{
    * - a string: static page title text instead of a search box
    *   (mockup behavior on account/checkout/contact/orders/order-detail/order-confirm pages)
    */
-  header?: 'search' | string
+    header?: 'search' | 'live-search' | string
+  /** Pre-fills the search box — only used when header="live-search", so a direct /search?q=... visit shows the typed query, not an empty box. */
+  searchValue?: string
   /**
    * Optional server-known cart count for the very first paint, so the
    * badge doesn't flash in late. If omitted, the badge starts hidden and
@@ -688,6 +690,7 @@ export const Layout: FC<LayoutProps> = ({
   description,
   active,
   header = 'search',
+  searchValue = '',
   initialCartCount,
   children,
 }) => {
@@ -746,14 +749,36 @@ export const Layout: FC<LayoutProps> = ({
             Annapurna
           </a>
 
-          {header === 'search' ? (
+                    {header === 'search' || header === 'live-search' ? (
             <div class="searchwrap">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                 <circle cx="11" cy="11" r="7" />
                 <path d="m20 20-3.5-3.5" />
               </svg>
-              {/* Search wiring (submit route, live results, etc.) left to you. */}
-              <input type="search" name="q" placeholder="Search atta, besan, millets…" />
+              {header === 'live-search' ? (
+                <input
+                  type="search"
+                  name="q"
+                  id="search-input"
+                  value={searchValue}
+                  placeholder="Search atta, besan, millets…"
+                  hx-get="/search"
+                  hx-trigger="input changed delay:400ms, search"
+                  hx-include="#search-active-category"
+                  hx-target="#search-results"
+                  hx-swap="outerHTML"
+                  hx-push-url="true"
+                />
+              ) : (
+                // Elsewhere (home/products/product) this box doesn't filter
+                // anything itself — Enter just hands off to the real search
+                // page, same as the original mockup's behavior.
+                <input
+                  type="search"
+                  placeholder="Search atta, besan, millets…"
+                  onkeydown="if(event.key==='Enter'){location.href='/search?q='+encodeURIComponent(this.value)}"
+                />
+              )}
             </div>
           ) : (
             <div class="searchwrap">

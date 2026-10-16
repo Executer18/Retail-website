@@ -36,6 +36,8 @@ import { productRoutes } from './routes/products'
 import { contactRoutes } from './routes/contact'
 import { accountRoutes } from './routes/account' 
 import { paymentRoutes } from './routes/payment'
+import { SearchPage, SearchResults } from './pages/SearchPage'
+
 
 
 
@@ -187,9 +189,34 @@ app.get('/products/:id', async (c) => {
 })
 
 
+// search page
 
+app.get('/search', async (c) => {
+    const db = getDB(c.env)
+    const sessionId = c.get('sessionId')
+    const searchQuery = c.req.query('q') || ''
+    const activeCategory = c.req.query('category') || 'all'
 
+    const conditions = []
+    if (activeCategory !== 'all') conditions.push(eq(products.category, activeCategory))
+    if (searchQuery) conditions.push(like(products.itemName, `%${searchQuery}%`))
 
+    const rows = conditions.length > 0 ? await db.select().from(products).where(and(...conditions)) : await db.select().from(products)
+
+    const allRows = await db.select({ category: products.category }).from(products)
+    const categories = Array.from(new Set(allRows.map((r) => r.category))).sort()
+    const cartQuantities = await getCartQuantities(db, sessionId)
+
+    const props = {
+      products: sortOutOfStockLast(groupBySizeVariants(rows)),
+      categories,
+      activeCategory,
+      searchQuery,
+      cartQuantities,
+    }
+
+    return c.html(c.req.header('HX-Request') ? <SearchResults {...props} /> : <SearchPage {...props} />)
+  })
 
 
 
