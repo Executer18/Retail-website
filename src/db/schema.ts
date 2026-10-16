@@ -114,7 +114,7 @@ export const orders = sqliteTable(
     customerPhone: text("customer_phone").notNull(),
   
 paymentMethod: text("payment_method", { enum: ["counter", "online"] }).notNull().default("counter"),
-paymentStatus: text("payment_status", { enum: ["unpaid", "paid"] }).notNull().default("unpaid"),
+paymentStatus: text("payment_status", { enum: ["unpaid", "paid", "refunded"] }).notNull().default("unpaid"),
 razorpayOrderId: text("razorpay_order_id"),
 razorpayPaymentId: text("razorpay_payment_id"),
 cartSessionId: text("cart_session_id"), // which cart an online order came from, so it can be cleared once paid

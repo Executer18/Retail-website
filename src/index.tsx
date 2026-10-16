@@ -38,6 +38,8 @@ import { accountRoutes } from './routes/account'
 import { paymentRoutes } from './routes/payment'
 import { SearchPage, SearchResults } from './pages/SearchPage'
 
+import { dashboardRouter } from "./pages/admin/dashboard";
+import { adminOrdersRouter } from "./pages/admin/orders";
 
 
 
@@ -221,7 +223,9 @@ app.get('/search', async (c) => {
 
 
 
-
+app.route("/admin/products", productsRouter);
+app.route("/admin/orders", adminOrdersRouter);
+app.route("/admin", dashboardRouter);
 
 
 
@@ -239,14 +243,6 @@ app.on(["GET", "POST"], "/api/auth/*", (c: Context) => createAuth(c.env).handler
 
 
 
-app.get("/admin", requireAdmin, (c: Context) => {
-  return c.html(`<h1>Admin Dashboard</h1>
-  <p>You are logged in as admin.</p>
-  <form method="POST" action="/logout">
-      <button type="submit">Logout</button>
-    </form>
-  `)
-})
 
 
 
@@ -265,17 +261,7 @@ app.get("/images/*", async (c) => {
 
 
 
-app.get("/signup-test", async (c: Context) => {
-  const result = await createAuth(c.env).api.signUpEmail({
-    body: {
-      email: "admin@test.com",
-      password: "password123",
-      name: "Admin",
-    },
-    headers: c.req.raw.headers,
-  })
-  return c.json({ success: true, user: result?.user })
-})
+
 
 
 // GET /login — show login form
@@ -312,14 +298,7 @@ app.post("/logout", async (c: Context) => {
 })
 
 
-// GET /admin — protected test route
-app.get("/admin", async (c: Context) => {
-  const session = await createAuth(c.env).api.getSession({
-    headers: c.req.raw.headers,
-  })
-  if (!session) return c.redirect("/login")
-  return c.html(`<h1>Welcome ${session.user.email}</h1>`)
-})
+
 
 
 app.onError((error, c: Context )=>{

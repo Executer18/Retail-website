@@ -20,7 +20,13 @@ import {
   verifyPaymentSignature,
   verifyWebhookSignature,
 } from '../lib/razorpay'
-import { PAYMENT_WINDOW_MINUTES, expireStaleOnlineOrders, markOrderPaid } from '../lib/order-payments'
+import {
+  PAYMENT_WINDOW_MINUTES,
+  cancelOwnUnpaidOnlineOrder,
+  expireStaleOnlineOrders,
+  markOrderPaid,
+} from '../lib/order-payments'
+import { runInBackground, sendOrderBookedEmail } from '../lib/order-emails'
 import { PaymentPage } from '../pages/PaymentPage'
 
 export const paymentRoutes = new Hono<{ Bindings: Env; Variables: Variables }>()
@@ -182,7 +188,10 @@ paymentRoutes.post('/checkout/pay/:orderId/verify', async (c) => {
     return c.json({ message: 'Payment could not be verified.' }, 400)
   }
 
-  await markOrderPaid(getDB(c.env), orderId, paymentId)
+  const db = getDB(c.env)
+  const newlyPaid = await markOrderPaid(db, orderId, paymentId)
+  // The order is booked once the payment is in — email the customer (only the first time).
+  if (newlyPaid) runInBackground(c, sendOrderBookedEmail(c.env, db, orderId))
   return c.json({ ok: true, redirect: `/order-confirmed/${orderId}` })
 })
 
@@ -196,20 +205,9 @@ paymentRoutes.post('/checkout/pay/:orderId/cancel', async (c) => {
   const orderId = Number(c.req.param('orderId'))
   if (!Number.isInteger(orderId)) return c.json({ message: 'Order not found.' }, 404)
 
-  // Only an unpaid online order that is still open can be cancelled this way.
-  // The cart is deliberately left alone.
-  await getDB(c.env)
-    .update(orders)
-    .set({ status: 'Cancelled' })
-    .where(
-      and(
-        eq(orders.orderId, orderId),
-        eq(orders.customerId, me.customerId),
-        eq(orders.paymentMethod, 'online'),
-        eq(orders.paymentStatus, 'unpaid'),
-        eq(orders.status, 'Reserved')
-      )
-    )
+  // Only an unpaid online order that is still open can be cancelled this way. Its stock goes
+  // back on the shelf; the cart is deliberately left alone.
+  await cancelOwnUnpaidOnlineOrder(getDB(c.env), orderId, me.customerId)
 
   return c.json({ ok: true })
 })
@@ -260,6 +258,7 @@ paymentRoutes.post('/webhooks/razorpay', async (c) => {
 
   // Idempotent: a repeat delivery (or the browser verify already ran) changes nothing.
   // A database error here throws -> 500 -> Razorpay retries the webhook later.
-  await markOrderPaid(db, order.orderId, String(payment.id))
+  const newlyPaid = await markOrderPaid(db, order.orderId, String(payment.id))
+  if (newlyPaid) runInBackground(c, sendOrderBookedEmail(c.env, db, order.orderId))
   return c.json({ ok: true })
-}) 
+})

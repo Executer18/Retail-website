@@ -1,3 +1,25 @@
+// src/routes/checkout.ts
+//
+// GET  /checkout                 — the form (name, phone, pickup slot, payment method)
+// POST /checkout                 — requires login. Creates one `orders` row + `order_items` rows
+//                                  from the cart, then:
+//     paymentMethod = "counter"  -> clears the cart, redirects to /order-confirmed/:id
+//                                   (paymentStatus stays "unpaid" — paid at the counter).
+//     paymentMethod = "online"   -> keeps the cart, redirects to /checkout/pay/:id (Razorpay).
+//                                   The cart is cleared only when the payment succeeds
+//                                   (see markOrderPaid in lib/order-payments.ts).
+// GET  /order-confirmed/:orderId — the confirmation page, built from the saved order.
+//
+// Stock: booking an order takes the kilos off Products.inStockKg right away (reserveStock);
+// they go back if the order is cancelled (see lib/order-payments.ts).
+//
+// Emails: a counter order emails the customer straight away ("booked"); an online order
+// does it once the payment is confirmed (payment.tsx).
+//
+// Pricing: products.pricePerKg is the selling price. products.discount is the
+// amount added on top to get the MRP (price 100 + discount 40 -> MRP 140).
+// The customer pays pricePerKg; MRP and savings are for display only.
+
 import { Hono } from "hono";
 import { and, eq, asc } from "drizzle-orm";
 import { getDB } from "../db";
@@ -6,10 +28,15 @@ import { createAuth } from "../auth";
 import type { Env, Variables } from "../db";
 import { getAvailablePickupSlots } from "../lib/pickup-slots";
 import { razorpayConfigured } from "../lib/razorpay";
-import { cancelUnpaidOnlineOrders, expireStaleOnlineOrders } from "../lib/order-payments";
+import {
+  cancelUnpaidOnlineOrders,
+  expireStaleOnlineOrders,
+  releaseStock,
+  reserveStock,
+} from "../lib/order-payments";
+import { runInBackground, sendOrderBookedEmail } from "../lib/order-emails";
 import { CheckoutPage } from "../pages/CheckoutPage";
 import { OrderConfirmationPage } from "../pages/OrderConfirmationPage";
-import { redirect } from 'react-router-dom';
 
 export const checkoutRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -182,31 +209,58 @@ checkoutRoutes.post("/checkout", async (c) => {
   // Starting a new checkout replaces any online order still waiting for payment.
   await cancelUnpaidOnlineOrders(db, customerId);
 
-  const [insertedOrder] = await db
-    .insert(orders)
-    .values({
-      customerId,
-      status: "Reserved", // matches your real enum default, not "placed"
-      pickupSlot,
-      customerName,
-      customerPhone,
-      totalAmount,
-      paymentMethod,
-      paymentStatus: "unpaid",
-      // Online orders remember which cart they came from, so the cart can be
-      // cleared once the payment is confirmed (even if only the webhook sees it).
-      cartSessionId: paymentMethod === "online" ? sessionId : null,
-    })
-    .returning();
+  // Take the booked kilos off the shelf first. If any item no longer has enough stock,
+  // nothing is taken and the customer is told which one.
+  const stockLines = cartRows.map((row) => ({ productId: row.productId, quantityKg: row.quantityKg }));
+  const reserved = await reserveStock(db, stockLines);
+  if (!reserved.ok) {
+    const [short] = await db
+      .select({ name: products.itemName, left: products.inStockKg })
+      .from(products)
+      .where(eq(products.productId, reserved.productId));
+    const left = short ? Math.max(0, Math.round(short.left * 100) / 100) : 0;
+    return c.text(
+      short
+        ? `Sorry, only ${left} kg of ${short.name} is left. Please reduce the quantity in your cart.`
+        : "Sorry, one of the items in your cart is no longer available.",
+      400
+    );
+  }
 
-  await db.insert(orderItems).values(
-    cartRows.map((row) => ({
-      orderId: insertedOrder.orderId,
-      productId: row.productId,
-      weightKg: row.quantityKg, // matches real column name: weightKg
-      pricePerKgAtPurchase: row.pricePerKg,
-    }))
-  );
+  let insertedOrder: typeof orders.$inferSelect | undefined;
+  try {
+    [insertedOrder] = await db
+      .insert(orders)
+      .values({
+        customerId,
+        status: "Reserved", // matches your real enum default, not "placed"
+        pickupSlot,
+        customerName,
+        customerPhone,
+        totalAmount,
+        paymentMethod,
+        paymentStatus: "unpaid",
+        // Online orders remember which cart they came from, so the cart can be
+        // cleared once the payment is confirmed (even if only the webhook sees it).
+        cartSessionId: paymentMethod === "online" ? sessionId : null,
+      })
+      .returning();
+
+    await db.insert(orderItems).values(
+      cartRows.map((row) => ({
+        orderId: insertedOrder!.orderId,
+        productId: row.productId,
+        weightKg: row.quantityKg, // matches real column name: weightKg
+        pricePerKgAtPurchase: row.pricePerKg,
+      }))
+    );
+  } catch (err) {
+    // Something failed after the stock was taken: undo it so no kilos are lost.
+    await releaseStock(db, stockLines);
+    if (insertedOrder) await db.delete(orders).where(eq(orders.orderId, insertedOrder.orderId));
+    throw err;
+  }
+  if (!insertedOrder) throw new Error("Order was not created");
 
   if (paymentMethod === "online") {
     // Cart stays until the payment succeeds.
@@ -215,6 +269,7 @@ checkoutRoutes.post("/checkout", async (c) => {
 
   // Counter order: nothing more to wait for, so the cart is cleared now.
   await db.delete(cartItems).where(eq(cartItems.sessionId, sessionId));
+  runInBackground(c, sendOrderBookedEmail(c.env, db, insertedOrder.orderId));
   return c.redirect(`/order-confirmed/${insertedOrder.orderId}`, 303);
 });
 

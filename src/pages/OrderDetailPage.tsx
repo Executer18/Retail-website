@@ -13,7 +13,7 @@ export type OrderDetail = {
   customerPhone: string
   totalAmount: number // orders.totalAmount (what the customer pays)
   paymentMethod: string // "counter" | "online"
-  paymentStatus: string // "unpaid" | "paid"
+  paymentStatus: string // "unpaid" | "paid" | "refunded"
   razorpayPaymentId: string | null
 }
 
@@ -68,6 +68,11 @@ export const OrderDetailPage: FC<{
           <div class="ck-notice ck-notice--danger">
             The payment wasn't completed, so this order was cancelled. Your cart items are still saved —{' '}
             <a href="/cart">go to your cart</a> to order again.
+          </div>
+        )}
+        {order.paymentStatus === 'refunded' && (
+          <div class="ck-notice ck-notice--ok">
+            {rupee(order.totalAmount)} was refunded to your original payment method.
           </div>
         )}
         {cancelled && order.paymentStatus === 'paid' && (
@@ -166,11 +171,21 @@ export const OrderDetailPage: FC<{
             </div>
             <div class="row">
               <span>Payment status</span>
-              <span class={`ck-pill ck-pill--${pay.tone === 'paid' ? 'paid' : pay.tone === 'cancelled' ? 'cancelled' : 'pending'}`}>
+              <span
+                class={`ck-pill ck-pill--${
+                  pay.tone === 'paid'
+                    ? 'paid'
+                    : pay.tone === 'cancelled'
+                      ? 'cancelled'
+                      : pay.tone === 'refunded'
+                        ? 'refunded'
+                        : 'pending'
+                }`}
+              >
                 {pay.label}
               </span>
             </div>
-            {order.razorpayPaymentId && order.paymentStatus === 'paid' && (
+            {order.razorpayPaymentId && (order.paymentStatus === 'paid' || order.paymentStatus === 'refunded') && (
               <div class="row">
                 <span>Payment ID</span>
                 <span class="ck-payid">{order.razorpayPaymentId}</span>
@@ -206,4 +221,4 @@ export const OrderDetailPage: FC<{
       </div>
     </Layout>
   )
-} 
+}

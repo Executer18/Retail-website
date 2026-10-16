@@ -6,6 +6,7 @@ import { products, productImages } from "../../db/schema";
 import { eq, asc, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Env } from "../../db";
+import { AdminLayout } from "./AdminLayout";
 
 export const productsRouter = new Hono<{ Bindings: Env }>();
 
@@ -54,73 +55,6 @@ async function deleteFromR2(imageUrl: string, env: Env) {
   } catch (e) {
     console.error("R2 delete failed for", key, e);
   }
-}
-
-// ── Layout ─────────────────────────────────────────────
-function AdminLayout({ children, title }: { children: any; title: string }) {
-  return (
-    <html>
-      <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>{title} — Admin</title>
-        <style>{`
-          * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { font-family: system-ui, sans-serif; background: #f5f5f5; color: #333; }
-          nav { background: #1a1a2e; color: white; padding: 14px 24px; display: flex; gap: 24px; align-items: center; }
-          nav a { color: #ccc; text-decoration: none; font-size: 14px; }
-          nav a:hover { color: white; }
-          nav .brand { color: white; font-weight: 700; font-size: 16px; margin-right: auto; }
-          main { max-width: 1000px; margin: 32px auto; padding: 0 16px; }
-          h1 { font-size: 22px; margin-bottom: 20px; }
-          .btn { display: inline-block; padding: 8px 16px; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer; border: none; }
-          .btn-primary { background: #D8722A; color: white; }
-          .btn-danger { background: #e74c3c; color: white; }
-          .btn-secondary { background: #eee; color: #333; }
-          .btn-sm { padding: 5px 10px; font-size: 12px; }
-          table { width: 100%; background: white; border-radius: 8px; border-collapse: collapse; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
-          th { background: #f9f9f9; padding: 12px 16px; text-align: left; font-size: 13px; color: #666; border-bottom: 1px solid #eee; }
-          td { padding: 12px 16px; font-size: 14px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
-          tr:last-child td { border-bottom: none; }
-          img.thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 4px; background: #eee; }
-          .empty { background: white; border-radius: 8px; padding: 48px; text-align: center; color: #999; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
-          .form-card { background: white; border-radius: 8px; padding: 28px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); max-width: 560px; }
-          .field { margin-bottom: 16px; }
-          label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #555; }
-          input, select, textarea { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit; }
-          textarea { resize: vertical; min-height: 80px; }
-          input:focus, select:focus, textarea:focus { outline: none; border-color: #D8722A; }
-          .error { color: #e74c3c; font-size: 12px; margin-top: 4px; }
-          .hint { color: #999; font-size: 12px; margin-top: 4px; }
-          .alert { padding: 12px 16px; border-radius: 6px; margin-bottom: 20px; font-size: 14px; }
-          .alert-success { background: #d4edda; color: #155724; }
-          .alert-error { background: #f8d7da; color: #721c24; }
-          .stock-controls { display: flex; align-items: center; gap: 6px; }
-          .stock-btn { width: 28px; height: 28px; border-radius: 4px; border: 1px solid #ddd; background: white; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }
-          .actions { display: flex; gap: 8px; }
-          .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-          .image-manager { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
-          .image-manager__item { position: relative; width: 84px; }
-          .image-manager__item img { width: 84px; height: 84px; object-fit: cover; border-radius: 6px; border: 1px solid #ddd; }
-          .image-manager__cover-tag { position: absolute; top: 4px; left: 4px; background: #D8722A; color: white; font-size: 9px; padding: 2px 6px; border-radius: 4px; font-weight: 700; }
-          .image-manager__controls { display: flex; justify-content: space-between; margin-top: 4px; gap: 4px; }
-          .image-manager__controls button { flex: 1; font-size: 11px; padding: 3px 0; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer; }
-          .image-manager__controls button.danger { color: #e74c3c; border-color: #f3c2bd; }
-        `}</style>
-      </head>
-      <body>
-        <nav>
-          <span class="brand">🌾 Atta Chakki Admin</span>
-          <a href="/admin">Dashboard</a>
-          <a href="/admin/products">Products</a>
-          <form method="POST" action="/logout" style="margin:0">
-            <button type="submit" style="background:none;border:none;color:#ccc;cursor:pointer;font-size:14px">Logout</button>
-          </form>
-        </nav>
-        <main>{children}</main>
-      </body>
-    </html>
-  );
 }
 
 // ── Shared category options ─────────────────────────────

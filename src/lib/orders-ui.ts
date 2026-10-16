@@ -22,16 +22,27 @@ export const STATUS_LABEL: Record<string, string> = {
 // ---------- Payment display (used by the orders list, details and confirmation pages) ----------
 
 export type PaymentFields = { status: string; paymentMethod: string; paymentStatus: string }
-export type PayTone = 'paid' | 'due' | 'pending' | 'cancelled'
+export type PayTone = 'paid' | 'due' | 'pending' | 'cancelled' | 'refunded'
 
 export type PaymentInfo = {
-  label: string // "Paid", "Pay at pickup", "Payment pending", "Order cancelled"
+  label: string // "Paid", "Pay at pickup", "Payment pending", "Order cancelled", "Refunded"
+  suffix?: string // text shown after the amount, e.g. "to original payment method"
   totalLabel: string // label for the total row: "Total paid", "To pay at pickup", ...
   tone: PayTone
   showAmount: boolean
 }
 
 export function paymentInfo(o: PaymentFields): PaymentInfo {
+  // Online payment given back (the admin's Refund button): "Refunded ₹X to original payment method"
+  if (o.paymentStatus === 'refunded') {
+    return {
+      label: 'Refunded',
+      suffix: 'to original payment method',
+      totalLabel: 'Amount refunded',
+      tone: 'refunded',
+      showAmount: true,
+    }
+  }
   if (o.paymentStatus === 'paid') {
     return o.status === 'Cancelled'
       ? { label: 'Paid · refund pending', totalLabel: 'Total paid', tone: 'cancelled', showAmount: true }
@@ -160,6 +171,9 @@ export const ORDERS_CSS =
 
 /* ---------- Payment state ---------- */
 .ck-pill--paid{background:var(--ck-success-bg);color:var(--ck-success)}
+.ck-pill--refunded{background:#e2d9f3;color:#432874}
+.ck-ocard__bot .ck-pay--refunded{color:#432874;font-weight:700;font-size:11.5px;line-height:1.3}
+.ck-notice--ok{background:var(--ck-success-bg);color:var(--ck-success)}
 .ck-ocard__bot .ck-pay--paid{color:var(--ck-success);font-weight:700}
 .ck-ocard__bot .ck-pay--due{color:var(--ck-warning);font-weight:700}
 .ck-ocard__bot .ck-pay--pending{color:var(--ck-warning);font-weight:700}

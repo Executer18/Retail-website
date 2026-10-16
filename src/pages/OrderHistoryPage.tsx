@@ -81,6 +81,7 @@ export const OrderHistoryPage: FC<{ orders: OrderCard[] }> = ({ orders }) => {
                     <span class={`ck-pay ck-pay--${pay.tone}`}>
                       {pay.label}
                       {pay.showAmount && <b>{rupee(order.totalAmount)}</b>}
+                      {pay.suffix && ` ${pay.suffix}`}
                     </span>
                     <a class="ck-ocard__btn" href={`/orders/${order.orderId}`}>
                       View details &#8594;
