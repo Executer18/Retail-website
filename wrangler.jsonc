@@ -3,12 +3,16 @@
 	"name": "retail-website",
 	"main": "src/index.tsx",
 	"compatibility_date": "2026-09-13",
+  "cache": {
+    "enabled": true
+  },
 	"compatibility_flags": [
 		"nodejs_compat"
 	],
 	"vars": {
 		"BETTER_AUTH_URL": "https://retail-website.kushalsh9123.workers.dev",
-    "EMAIL_FROM": "Atta Chakki <orders@surveyspeck.com>"
+    "EMAIL_FROM": "Atta Chakki <orders@surveyspeck.com>",
+    "SITE_URL": "https://retail-website.kushalsh9123.workers.dev"
 	},
 	"assets": {
 		"directory": "./public"

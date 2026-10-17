@@ -39,7 +39,10 @@ import { SearchPage, SearchResults } from './pages/SearchPage'
 
 import { dashboardRouter } from "./pages/admin/dashboard";
 import { adminOrdersRouter } from "./pages/admin/orders";
-
+import { seoRoutes } from './routes/seo'
+import { seoHeaders } from './middleware/seo'
+import { buildProductSeo } from './lib/product-seo'
+import { siteUrl } from './lib/seo'
 
 
 const app = new Hono<{ Bindings: Env }>()
@@ -63,7 +66,14 @@ function toCardData(row: typeof products.$inferSelect): ProductCardData {
 
 
 app.use("*", sessionMiddleware);
-
+app.use('*', async (c, next) => {
+  await next()
+  if (!c.res.headers.has('Cache-Control')) {
+    c.res.headers.set('Cache-Control', 'no-store')
+  }
+})
+app.use('*', seoHeaders)            // right after sessionMiddleware
+app.route('/', seoRoutes)           
 
 
 
@@ -154,7 +164,6 @@ app.get('/products/:id', async (c) => {
   const imageRows = await db.select().from(productImages).where(eq(productImages.productId, id)).orderBy(asc(productImages.sortOrder))
   const images = imageRows.length > 0 ? imageRows.map((img) => img.imageUrl) : row.imageUrl ? [row.imageUrl] : []
 
-  // This product's own pack-size siblings, for the inline SELECT SIZE control
   const siblingRows = await db.select().from(products).where(eq(products.itemName, row.itemName))
   const [family] = groupBySizeVariants(siblingRows)
 
@@ -162,6 +171,22 @@ app.get('/products/:id', async (c) => {
   const otherRows = await db.select().from(products).where(ne(products.category, row.category)).limit(10)
 
   const cartQuantities = await getCartQuantities(db, sessionId)
+
+  // must come BEFORE `const props`
+  const seo = buildProductSeo({
+    base: siteUrl(c.env, c.req.url),
+    name: row.itemName,
+    category: row.category,
+    description: row.description,
+    images,
+    familyIds: siblingRows.map((r) => r.productId),
+    variants: (family?.variants ?? []).map((v) => ({
+      id: v.id,
+      sizeKg: v.sizeKg,
+      pricePerKg: v.pricePerKg,
+      inStockKg: v.inStockKg,
+    })),
+  })
 
   const props = {
     product: {
@@ -180,13 +205,12 @@ app.get('/products/:id', async (c) => {
     sameCategoryProducts: groupBySizeVariants(sameCategoryRows).slice(0, 6),
     otherProducts: groupBySizeVariants(otherRows).slice(0, 6),
     cartQuantities,
+    seo,
   }
 
-  // ProductCard's click is an htmx request (fills the popup); a direct
-  // visit to this URL isn't, and gets the plain full-page fallback.
+  c.header('Vary', 'HX-Request')
   return c.html(c.req.header('HX-Request') ? <ProductDetailContent {...props} /> : <ProductDetailPage {...props} />)
 })
-
 
 // search page
 

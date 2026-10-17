@@ -28,6 +28,7 @@ export interface Env {
 RAZORPAY_KEY_SECRET: string;
 RAZORPAY_WEBHOOK_SECRET: string;
   EMAIL_FROM?: string;
+  SITE_URL?: string;
 }
 
 export function getDB(env: Env) {

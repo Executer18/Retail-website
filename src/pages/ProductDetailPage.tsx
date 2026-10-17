@@ -23,6 +23,11 @@ import { Layout } from '../components/Layout'
 import { ProductCard, type ProductCardData, type ProductVariant } from '../components/ProductCard'
 import { DetailCartControl, DetailVariantBadge } from '../components/DetailCartControl'
 import { rupee, formatSize, formatUnitPrice, packPrice } from '../lib/format'
+import type { ProductSeo } from '../lib/product-seo'
+
+
+
+
 
 export type ProductDetail = {
   id: number
@@ -38,6 +43,7 @@ export type ProductDetail = {
   ingredients?: string | null
   /** This product's own pack-size siblings (itself included). Always at least length 1. */
   variants: ProductVariant[]
+  
 }
 
 type ProductDetailProps = {
@@ -46,6 +52,8 @@ type ProductDetailProps = {
   otherProducts: ProductCardData[]
   /** productId -> quantityKg for the whole session cart — same map every other page uses. */
   cartQuantities: Record<number, number>
+  seo?: ProductSeo
+
 }
 
 export const ProductDetailContent: FC<ProductDetailProps> = ({ product, sameCategoryProducts, otherProducts, cartQuantities }) => {
@@ -237,7 +245,16 @@ export const ProductDetailContent: FC<ProductDetailProps> = ({ product, sameCate
 // no grid loaded underneath to pop up over, so this is a plain page.
 export const ProductDetailPage: FC<ProductDetailProps> = (props) => {
   return (
-    <Layout title={props.product.name} description={props.product.description || `${props.product.name} — fresh, stone-ground.`} active="product" header="search">
+    <Layout
+      title={props.product.name}
+      description={props.product.description || `${props.product.name} — fresh, stone-ground.`}
+      active="product"
+      header="search"
+      canonical={props.seo?.canonical}
+      image={props.seo?.image}
+      ogType="product"
+      jsonLd={props.seo?.jsonLd}
+    >
       <ProductDetailContent {...props} />
     </Layout>
   )
