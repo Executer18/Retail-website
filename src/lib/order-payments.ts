@@ -213,17 +213,12 @@ export async function markCounterOrderPaid(db: DB, orderId: number): Promise<boo
 // Admin: "refund" button. Online payments are test-only, so this just records the refund —
 // no Razorpay refund API call is made. The customer then sees
 // "Refunded ₹X to original payment method".
-export async function refundOnlineOrder(db: DB, orderId: number): Promise<boolean> {
+// Admin: "Mark as refunded" for any PAID order — online or paid at the counter.
+export async function refundPaidOrder(db: DB, orderId: number): Promise<boolean> {
   const updated = await db
     .update(orders)
     .set({ paymentStatus: 'refunded' })
-    .where(
-      and(
-        eq(orders.orderId, orderId),
-        eq(orders.paymentMethod, 'online'),
-        eq(orders.paymentStatus, 'paid')
-      )
-    )
+    .where(and(eq(orders.orderId, orderId), eq(orders.paymentStatus, 'paid')))
     .returning({ id: orders.orderId })
   return updated.length > 0
 }

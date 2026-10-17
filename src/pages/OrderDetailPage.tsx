@@ -72,7 +72,8 @@ export const OrderDetailPage: FC<{
         )}
         {order.paymentStatus === 'refunded' && (
           <div class="ck-notice ck-notice--ok">
-            {rupee(order.totalAmount)} was refunded to your original payment method.
+            {rupee(order.totalAmount)} was refunded{' '}
+{order.paymentMethod === 'online' ? 'to your original payment method' : 'at the store'}.
           </div>
         )}
         {cancelled && order.paymentStatus === 'paid' && (

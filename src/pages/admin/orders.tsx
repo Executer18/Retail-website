@@ -6,8 +6,8 @@
 // POST /admin/orders/:id/status       — move to the next status (Ready also emails the customer)
 // POST /admin/orders/:id/mark-paid    — counter order: payment received at the counter
 // POST /admin/orders/:id/cancel       — cancel (stock goes back on the shelf)
-// POST /admin/orders/:id/refund       — cancelled online order: record the refund (test mode: no Razorpay call)
-// POST /admin/orders/:id/cancel-refund— cancel + refund in one click (paid online orders)
+// POST /admin/orders/:id/refund       — cancelled PAID order (online or counter): mark it refunded
+// POST /admin/orders/:id/cancel-refund— cancel + mark refunded in one click (any paid order)
 //
 // Mounted in index.tsx with:  app.route("/admin/orders", adminOrdersRouter)
 
@@ -23,10 +23,15 @@ import {
   cancelOrderAsAdmin,
   expireStaleOnlineOrders,
   markCounterOrderPaid,
-  refundOnlineOrder,
+  refundPaidOrder,
 } from '../../lib/order-payments'
 import { advanceOrder, nextStatus } from '../../lib/order-status'
-import { runInBackground, sendOrderReadyEmail } from '../../lib/order-emails'
+import {
+  runInBackground,
+  sendOrderCancelledEmail,
+  sendOrderReadyEmail,
+  sendOrderRefundedEmail,
+} from '../../lib/order-emails'
 import { rupee } from '../../lib/checkout-ui'
 import { paymentInfo, pickupParts, pickupText, placedOnText, statusPill } from '../../lib/orders-ui'
 import { AdminLayout } from './AdminLayout'
@@ -289,6 +294,18 @@ adminOrdersRouter.get('/', requireAdmin, async (c) => {
                           </form>
                         )}
                         {blocked && <span class="muted">Awaiting payment</span>}
+                        {o.status === 'Cancelled' && o.paymentStatus === 'paid' && (
+                          <form method="POST" action={`/admin/orders/${o.orderId}/refund`}>
+                            <input type="hidden" name="back" value={back} />
+                            <button
+                              type="submit"
+                              class="btn btn-primary btn-sm"
+                              onclick={`return confirm('Mark order #${o.orderId} as refunded (${rupee(o.totalAmount)})? The customer will be emailed.')`}
+                            >
+                              Mark refunded
+                            </button>
+                          </form>
+                        )}
                         <a href={`/admin/orders/${o.orderId}`} class="btn btn-outline btn-sm">
                           Open
                         </a>
@@ -364,7 +381,7 @@ adminOrdersRouter.get('/:id', requireAdmin, async (c) => {
   const next = nextStatus(order.status)
   const blocked = awaitingOnline(order)
   const open = order.status !== 'Cancelled' && order.status !== 'Collected'
-  const paidOnline = order.paymentMethod === 'online' && order.paymentStatus === 'paid'
+  const isPaid = order.paymentStatus === 'paid' // online or paid at the counter
   const base = `/admin/orders/${order.orderId}`
 
   return c.html(
@@ -407,18 +424,18 @@ adminOrdersRouter.get('/:id', requireAdmin, async (c) => {
               </button>
             </form>
           )}
-          {open && paidOnline && (
+          {open && isPaid && (
             <form method="POST" action={`${base}/cancel-refund`}>
               <button
                 type="submit"
                 class="btn btn-danger"
-                onclick={`return confirm('Cancel order #${order.orderId} and refund ${rupee(order.totalAmount)} to the customer?')`}
+                onclick={`return confirm('Cancel order #${order.orderId} and mark ${rupee(order.totalAmount)} as refunded? The customer will be emailed.')`}
               >
                 Cancel &amp; refund
               </button>
             </form>
           )}
-          {open && !paidOnline && (
+          {open && !isPaid && (
             <form method="POST" action={`${base}/cancel`}>
               <button
                 type="submit"
@@ -429,18 +446,18 @@ adminOrdersRouter.get('/:id', requireAdmin, async (c) => {
               </button>
             </form>
           )}
-          {order.status === 'Cancelled' && order.paymentMethod === 'online' && order.paymentStatus === 'paid' && (
+          {order.status === 'Cancelled' && isPaid && (
             <form method="POST" action={`${base}/refund`}>
               <button
                 type="submit"
                 class="btn btn-primary"
-                onclick={`return confirm('Refund ${rupee(order.totalAmount)} to the customer for order #${order.orderId}?')`}
+                onclick={`return confirm('Mark order #${order.orderId} as refunded (${rupee(order.totalAmount)})? The customer will be emailed.')`}
               >
-                Refund {rupee(order.totalAmount)}
+                Mark as refunded ({rupee(order.totalAmount)})
               </button>
             </form>
           )}
-          {!open && !(order.status === 'Cancelled' && paidOnline) && (
+          {!open && !(order.status === 'Cancelled' && isPaid) && (
             <span class="muted">
               {order.status === 'Collected' ? 'This order is complete.' : 'This order is cancelled.'}
             </span>
@@ -448,7 +465,8 @@ adminOrdersRouter.get('/:id', requireAdmin, async (c) => {
         </div>
         {order.paymentStatus === 'refunded' && (
           <p class="muted" style="margin-top:10px">
-            Refunded. The customer sees "Refunded {rupee(order.totalAmount)} to original payment method".
+            Refunded. The customer sees "Refunded {rupee(order.totalAmount)}{' '}
+            {order.paymentMethod === 'online' ? 'to original payment method' : 'at the store'}".
           </p>
         )}
         {next === 'Ready' && open && !blocked && (
@@ -576,7 +594,20 @@ adminOrdersRouter.post('/:id/mark-paid', requireAdmin, async (c) => {
 adminOrdersRouter.post('/:id/cancel', requireAdmin, async (c) => {
   if (!sameOrigin(c)) return c.text('Request blocked.', 403)
   const orderId = Number(c.req.param('id'))
-  const ok = await cancelOrderAsAdmin(getDB(c.env), orderId)
+  const db = getDB(c.env)
+
+  // Look before cancelling: only an order that was really booked (counter order, or paid
+  // online) gets a "cancelled" email — an online order nobody paid for was never booked.
+  const [before] = await db
+    .select({ paymentMethod: orders.paymentMethod, paymentStatus: orders.paymentStatus })
+    .from(orders)
+    .where(eq(orders.orderId, orderId))
+
+  const ok = await cancelOrderAsAdmin(db, orderId)
+  if (ok && before && (before.paymentMethod === 'counter' || before.paymentStatus === 'paid')) {
+    runInBackground(c, sendOrderCancelledEmail(c.env, db, orderId))
+  }
+
   flash(
     c,
     ok ? 'success' : 'error',
@@ -585,21 +616,29 @@ adminOrdersRouter.post('/:id/cancel', requireAdmin, async (c) => {
   return c.redirect(`/admin/orders/${orderId}`, 303)
 })
 
+// Mark a cancelled, PAID order (paid online or at the counter) as refunded.
 adminOrdersRouter.post('/:id/refund', requireAdmin, async (c) => {
   if (!sameOrigin(c)) return c.text('Request blocked.', 403)
   const orderId = Number(c.req.param('id'))
+  const body = await c.req.parseBody()
+  const back = safeBack(body.back, `/admin/orders/${orderId}`)
   const db = getDB(c.env)
 
   // Only a cancelled order is refunded (use "Cancel & refund" for an active one).
   const [order] = await db.select({ status: orders.status }).from(orders).where(eq(orders.orderId, orderId))
   if (!order || order.status !== 'Cancelled') {
     flash(c, 'error', 'Only a cancelled order can be refunded.')
-    return c.redirect(`/admin/orders/${orderId}`, 303)
+    return c.redirect(back, 303)
   }
 
-  const ok = await refundOnlineOrder(db, orderId)
-  flash(c, ok ? 'success' : 'error', ok ? `Order #${orderId} refunded.` : 'This order has no online payment to refund.')
-  return c.redirect(`/admin/orders/${orderId}`, 303)
+  const ok = await refundPaidOrder(db, orderId)
+  if (ok) runInBackground(c, sendOrderRefundedEmail(c.env, db, orderId))
+  flash(
+    c,
+    ok ? 'success' : 'error',
+    ok ? `Order #${orderId} marked as refunded. The customer is being emailed.` : 'This order has no payment to refund.'
+  )
+  return c.redirect(back, 303)
 })
 
 adminOrdersRouter.post('/:id/cancel-refund', requireAdmin, async (c) => {
@@ -613,13 +652,16 @@ adminOrdersRouter.post('/:id/cancel-refund', requireAdmin, async (c) => {
     return c.redirect(`/admin/orders/${orderId}`, 303)
   }
 
-  const refunded = await refundOnlineOrder(db, orderId)
+  const refunded = await refundPaidOrder(db, orderId)
+  // One email is enough: the refund email already says the order was cancelled.
+  runInBackground(c, refunded ? sendOrderRefundedEmail(c.env, db, orderId) : sendOrderCancelledEmail(c.env, db, orderId))
+
   flash(
     c,
     'success',
     refunded
-      ? `Order #${orderId} cancelled and refunded. Its stock is back on the shelf.`
-      : `Order #${orderId} cancelled. It had no online payment to refund.`
+      ? `Order #${orderId} cancelled and marked as refunded. Its stock is back on the shelf.`
+      : `Order #${orderId} cancelled. It had no payment to refund.`
   )
   return c.redirect(`/admin/orders/${orderId}`, 303)
 })

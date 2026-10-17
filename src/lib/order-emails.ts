@@ -76,7 +76,7 @@ async function sendEmail(env: Env, to: string, subject: string, html: string): P
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: env.EMAIL_FROM || 'Atta Chakki <onboarding@resend.dev>',
+      from: env.EMAIL_FROM || 'Atta Chakki <orders@surveyspeck.com>',
       to: [to],
       subject,
       html,
@@ -144,6 +144,59 @@ export async function sendOrderBookedEmail(env: Env, db: DB, orderId: number): P
   `)
 
   await sendEmail(env, email, `Order #${order.orderId} booked — pickup ${pickupLine(order.pickupSlot)}`, html)
+}
+
+// ---------------------------------------------------------------- cancelled
+
+// Sent when the admin cancels an order that had been booked.
+export async function sendOrderCancelledEmail(env: Env, db: DB, orderId: number): Promise<void> {
+  const data = await loadOrderForEmail(db, orderId)
+  if (!data) return
+  const { order, email, items } = data
+
+  let moneyLine = 'No payment was taken for this order.'
+  if (order.paymentStatus === 'paid') {
+    moneyLine =
+      order.paymentMethod === 'online'
+        ? `Your online payment of <b>${esc(rupee(order.totalAmount))}</b> will be refunded to your original payment method. We'll email you once the refund is processed.`
+        : `You paid <b>${esc(rupee(order.totalAmount))}</b> at the counter. Please contact the store to get your refund.`
+  }
+
+  const html = shell(`
+    <p style="margin:0 0 10px">Hi ${esc(order.customerName)},</p>
+    <p style="margin:0 0 10px;font-size:16px"><b>Your order #${order.orderId} has been cancelled.</b></p>
+    <p style="margin:0 0 4px"><b>Pickup was:</b> ${esc(pickupLine(order.pickupSlot))}</p>
+    ${itemsTable(items, order.totalAmount)}
+    <p style="margin:0 0 14px">${moneyLine}</p>
+    <p style="margin:0 0 14px">If you didn't expect this, please contact the store.</p>
+    <p style="margin:0"><a href="${esc(orderLink(env, order.orderId))}" style="color:#e81e57;font-weight:700">View your order</a></p>
+  `)
+
+  await sendEmail(env, email, `Your order #${order.orderId} has been cancelled`, html)
+}
+
+// ---------------------------------------------------------------- refunded
+
+// Sent when the admin marks a (cancelled) order as refunded.
+export async function sendOrderRefundedEmail(env: Env, db: DB, orderId: number): Promise<void> {
+  const data = await loadOrderForEmail(db, orderId)
+  if (!data) return
+  const { order, email, items } = data
+
+  const where =
+    order.paymentMethod === 'online'
+      ? 'to your original payment method. Depending on your bank, it can take a few working days to show up'
+      : 'at the store'
+
+  const html = shell(`
+    <p style="margin:0 0 10px">Hi ${esc(order.customerName)},</p>
+    <p style="margin:0 0 10px;font-size:16px"><b>Your refund of ${esc(rupee(order.totalAmount))} is done.</b></p>
+    <p style="margin:0 0 10px">Your order <b>#${order.orderId}</b> was cancelled and <b>${esc(rupee(order.totalAmount))}</b> has been refunded ${where}.</p>
+    ${itemsTable(items, order.totalAmount)}
+    <p style="margin:0"><a href="${esc(orderLink(env, order.orderId))}" style="color:#e81e57;font-weight:700">View your order</a></p>
+  `)
+
+  await sendEmail(env, email, `Refund of ${rupee(order.totalAmount)} for order #${order.orderId}`, html)
 }
 
 // ---------------------------------------------------------------- ready

@@ -1,5 +1,5 @@
  /** @jsxImportSource hono/jsx */
-
+// src/index.tsx
 import { Hono, type Context } from 'hono';
 import { HTTPException } from 'hono/http-exception'
 import { html } from 'hono/html';
@@ -22,9 +22,8 @@ import { sessionMiddleware } from "./middleware/session";
 import { cartRoutes } from './routes/cart'
 import { checkoutRoutes } from './routes/checkout'
 import { orderRoutes } from './routes/orders'
-import { grindQuoteRoutes } from './routes/grind-quote'
-import { sellQuoteRoutes } from './routes/sell-quote'
-import { OrderLandingPage } from './pages/OrderLandingPage'
+
+
 
 import { Layout } from './components/Layout'
 import { groupBySizeVariants, maxVariantStock } from './lib/product-variants'
@@ -67,7 +66,6 @@ app.use("*", sessionMiddleware);
 
 
 
-app.get('/order', (c) => c.html(<OrderLandingPage />))
 
 
 app.route('/', paymentRoutes)   
@@ -76,8 +74,7 @@ app.route('/', contactRoutes)
 app.route('/', cartRoutes)
 app.route('/', checkoutRoutes)
 app.route('/', orderRoutes)
-app.route('/', grindQuoteRoutes)
-app.route('/', sellQuoteRoutes)
+
 app.route('/', productRoutes)
 
 

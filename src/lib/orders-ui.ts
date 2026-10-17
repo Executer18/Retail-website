@@ -37,7 +37,7 @@ export function paymentInfo(o: PaymentFields): PaymentInfo {
   if (o.paymentStatus === 'refunded') {
     return {
       label: 'Refunded',
-      suffix: 'to original payment method',
+      suffix: o.paymentMethod === 'online' ? 'to original payment method' : 'at the store',
       totalLabel: 'Amount refunded',
       tone: 'refunded',
       showAmount: true,

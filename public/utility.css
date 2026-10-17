@@ -716,7 +716,7 @@ h1,h2,h3,h4{color:var(--color-ink)}
   overflow-y:auto;
   position:relative;
 }
-.modal.tall{max-height:92vh}
+.modal.tall{max-height:77vh}
 .modal-back.open .modal{transform:none}
 
 .modal .grab{

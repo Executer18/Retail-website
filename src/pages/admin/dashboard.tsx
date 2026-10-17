@@ -43,7 +43,7 @@ dashboardRouter.get('/', requireAdmin, async (c) => {
     return Number(row?.n ?? 0)
   }
 
-  const [activeCount, readyCount, awaitingPayment, pickupsToday] = await Promise.all([
+  const [activeCount, readyCount, awaitingPayment, pickupsToday, refundsPending ] = await Promise.all([
     count(needsAction),
     count(eq(orders.status, 'Ready')),
     count(and(eq(orders.paymentMethod, 'online'), eq(orders.paymentStatus, 'unpaid'), eq(orders.status, 'Reserved'))),
@@ -53,7 +53,9 @@ dashboardRouter.get('/', requireAdmin, async (c) => {
         inArray(orders.status, [...ACTIVE, 'Collected'])
       )
     ),
-  ])
+    count(and(eq(orders.status, 'Cancelled'), eq(orders.paymentStatus, 'paid'))),
+])
+  
 
   const [cash] = await db
     .select({ total: sql<number>`coalesce(sum(${orders.totalAmount}), 0)` })
@@ -141,6 +143,14 @@ dashboardRouter.get('/', requireAdmin, async (c) => {
           <small>To collect at counter</small>
           <b>{rupee(Number(cash?.total ?? 0))}</b>
         </div>
+
+        <div class="stat">
+  <a href="/admin/orders?status=Cancelled&pay=paid">
+    <small>Refunds pending</small>
+    <b>{refundsPending}</b>
+  </a>
+</div>
+        
       </div>
 
       <div class="panel">

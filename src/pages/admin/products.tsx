@@ -7,20 +7,30 @@ import { eq, asc, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Env } from "../../db";
 import { AdminLayout } from "./AdminLayout";
+import { formatSize } from "../../lib/format";
 
 export const productsRouter = new Hono<{ Bindings: Env }>();
 
 // ── Validation Schema ──────────────────────────────────
+// size and discount are new — size is NOT cosmetic: it's what the
+// storefront groups same-itemName rows by into one product's size
+// options, and what it multiplies pricePerKg by to show the actual
+// pack price. A product with no size set would silently default to
+// 1kg on the storefront, so this is required, not optional.
 const productSchema = z.object({
   itemName: z.string().min(1, "Product name is required"),
   category: z.string().min(1, "Category is required"),
   pricePerKg: z.coerce.number().positive("Price must be positive"),
   inStockKg: z.coerce.number().min(0, "Stock cannot be negative"),
+  size: z.coerce.number().positive("Pack size must be a positive number"),
+  discount: z.coerce.number().min(0, "Discount can't be negative").max(100, "Discount can't exceed 100%").optional(),
   description: z.string().optional(),
   ingredients: z.string().optional(),
+  highlights: z.string().optional(),
 });
 
 // ── Helper: upload one or many files to R2, return URLs in order ──
+// (unchanged)
 async function uploadImagesToR2(
   files: File | File[] | undefined,
   env: Env
@@ -38,9 +48,6 @@ async function uploadImagesToR2(
       });
       urls.push(`/images/${key}`);
     } catch (e) {
-      // One failed upload shouldn't kill the rest — log and continue.
-      // If this ever fires, check wrangler tail for the R2 error and
-      // manually verify no orphan DB row was created for this file.
       console.error("R2 upload failed for", file.name, e);
     }
   }
@@ -48,6 +55,7 @@ async function uploadImagesToR2(
 }
 
 // ── Helper: delete an R2 object, swallow errors (already-gone is fine) ──
+// (unchanged)
 async function deleteFromR2(imageUrl: string, env: Env) {
   const key = imageUrl.replace("/images/", "");
   try {
@@ -59,6 +67,49 @@ async function deleteFromR2(imageUrl: string, env: Env) {
 
 // ── Shared category options ─────────────────────────────
 const CATEGORIES = ["Atta", "Flour", "Grain", "Rice", "massala", "other"];
+
+// ── Shared field markup for size/discount/highlights, used by both the
+//    "new" form and the validation-error re-render so they can't drift
+//    out of sync with each other. ──────────────────────────────────
+function SizeDiscountHighlightsFields({
+  sizeValue,
+  discountValue,
+  highlightsValue,
+  errors,
+}: {
+  sizeValue: string;
+  discountValue: string;
+  highlightsValue: string;
+  errors?: { size?: string[]; discount?: string[] };
+}) {
+  return (
+    <>
+      <div class="field">
+        <label>Pack Size (kg)</label>
+        <input name="size" type="number" step="0.001" min="0.001" value={sizeValue} placeholder="e.g. 1, 0.5, 5" required />
+        <p class="hint">
+          The weight of ONE pack — 1 for a 1kg bag, 0.5 for 500g, 5 for a 5kg sack. To offer this item in more than one
+          pack size, add it again later with the same Product Name and a different Pack Size — the storefront
+          automatically groups same-named products together as size options on one product card.
+        </p>
+        {errors?.size && <p class="error">{errors.size[0]}</p>}
+      </div>
+      <div class="field">
+        <label>Discount %</label>
+        <input name="discount" type="number" step="1" min="0" max="100" value={discountValue} placeholder="0" />
+        <p class="hint">Percent off, shown as a strikethrough price on the storefront. Leave at 0 for no discount.</p>
+        {errors?.discount && <p class="error">{errors.discount[0]}</p>}
+      </div>
+      <div class="field">
+        <label>Highlights</label>
+        <textarea name="highlights" placeholder={"One short point per line, e.g.\nStone ground\nNo added preservatives\nPacked fresh weekly"}>
+          {highlightsValue}
+        </textarea>
+        <p class="hint">Each line becomes one bullet under "Highlights" on the product page — separate from Description.</p>
+      </div>
+    </>
+  );
+}
 
 // ── GET /admin/products ────────────────────────────────
 productsRouter.get("/", requireAdmin, async (c) => {
@@ -91,7 +142,9 @@ productsRouter.get("/", requireAdmin, async (c) => {
               <th>Image</th>
               <th>Name</th>
               <th>Category</th>
+              <th>Size</th>
               <th>Price/kg</th>
+              <th>Discount</th>
               <th>Stock (kg)</th>
               <th>Actions</th>
             </tr>
@@ -108,7 +161,9 @@ productsRouter.get("/", requireAdmin, async (c) => {
                 </td>
                 <td style="font-weight:600">{p.itemName}</td>
                 <td>{p.category}</td>
+                <td>{p.size != null ? formatSize(p.size) : <span class="muted">not set</span>}</td>
                 <td>₹{p.pricePerKg}</td>
+                <td>{p.discount ? `${p.discount}%` : <span class="muted">—</span>}</td>
                 <td>
                   <div class="stock-controls">
                     <form method="POST" action={`/admin/products/${p.productId}/stock/decrease`} style="margin:0">
@@ -160,11 +215,15 @@ productsRouter.get("/new", requireAdmin, (c) => {
           <div class="field">
             <label>Price per kg (₹)</label>
             <input name="pricePerKg" type="number" step="0.01" min="0" placeholder="e.g. 45.00" required />
+            <p class="hint">This is the rate PER KILOGRAM, not the pack price. A 5kg pack at ₹100/kg costs ₹500 — enter 100 here, the storefront does the multiplication.</p>
           </div>
           <div class="field">
             <label>Stock (kg)</label>
             <input name="inStockKg" type="number" step="0.1" min="0" placeholder="e.g. 100" required />
           </div>
+
+          <SizeDiscountHighlightsFields sizeValue="" discountValue="0" highlightsValue="" />
+
           <div class="field">
             <label>Description</label>
             <textarea name="description" placeholder="One short point per line, e.g.&#10;Stone ground&#10;No added preservatives&#10;Packed fresh weekly"></textarea>
@@ -228,6 +287,14 @@ productsRouter.post("/", requireAdmin, async (c) => {
               <input name="inStockKg" type="number" step="0.1" value={String(body["inStockKg"] || "")} required />
               {errors.inStockKg && <p class="error">{errors.inStockKg[0]}</p>}
             </div>
+
+            <SizeDiscountHighlightsFields
+              sizeValue={String(body["size"] || "")}
+              discountValue={String(body["discount"] || "0")}
+              highlightsValue={String(body["highlights"] || "")}
+              errors={errors}
+            />
+
             <div class="field">
               <label>Description</label>
               <textarea name="description">{String(body["description"] || "")}</textarea>
@@ -258,8 +325,11 @@ productsRouter.post("/", requireAdmin, async (c) => {
     category: parsed.data.category,
     pricePerKg: parsed.data.pricePerKg,
     inStockKg: parsed.data.inStockKg,
+    size: parsed.data.size,
+    discount: parsed.data.discount ?? 0,
     description: parsed.data.description || null,
     ingredients: parsed.data.ingredients || null,
+    highlights: parsed.data.highlights || null,
     imageUrl: imageUrls[0] || null, // legacy column mirrors the cover image
   });
 
@@ -354,11 +424,19 @@ productsRouter.get("/:id/edit", requireAdmin, async (c) => {
           <div class="field">
             <label>Price per kg (₹)</label>
             <input name="pricePerKg" type="number" step="0.01" value={String(product.pricePerKg)} required />
+            <p class="hint">This is the rate PER KILOGRAM, not the pack price — the storefront multiplies this by Pack Size below.</p>
           </div>
           <div class="field">
             <label>Stock (kg)</label>
             <input name="inStockKg" type="number" step="0.1" value={String(product.inStockKg)} required />
           </div>
+
+          <SizeDiscountHighlightsFields
+            sizeValue={product.size != null ? String(product.size) : ""}
+            discountValue={product.discount != null ? String(product.discount) : "0"}
+            highlightsValue={product.highlights || ""}
+          />
+
           <div class="field">
             <label>Description</label>
             <textarea name="description" placeholder="One short point per line">{product.description || ""}</textarea>
@@ -429,8 +507,11 @@ productsRouter.post("/:id/edit", requireAdmin, async (c) => {
       category: parsed.data.category,
       pricePerKg: parsed.data.pricePerKg,
       inStockKg: parsed.data.inStockKg,
+      size: parsed.data.size,
+      discount: parsed.data.discount ?? 0,
       description: parsed.data.description || null,
       ingredients: parsed.data.ingredients || null,
+      highlights: parsed.data.highlights || null,
       imageUrl: coverUrl,
       updatedAt: new Date().toISOString(),
     })
@@ -440,6 +521,7 @@ productsRouter.post("/:id/edit", requireAdmin, async (c) => {
 });
 
 // ── POST /admin/products/:id/images/:imageId/delete ────
+// (unchanged)
 productsRouter.post("/:id/images/:imageId/delete", requireAdmin, async (c) => {
   const db = getDB(c.env);
   const productId = Number(c.req.param("id"));
@@ -451,7 +533,6 @@ productsRouter.post("/:id/images/:imageId/delete", requireAdmin, async (c) => {
     await db.delete(productImages).where(eq(productImages.imageId, imageId));
   }
 
-  // Re-sync the cover image in case we just deleted it
   const remaining = await db
     .select()
     .from(productImages)
@@ -466,6 +547,7 @@ productsRouter.post("/:id/images/:imageId/delete", requireAdmin, async (c) => {
 });
 
 // ── POST /admin/products/:id/images/:imageId/move-up ───
+// (unchanged)
 productsRouter.post("/:id/images/:imageId/move-up", requireAdmin, async (c) => {
   const db = getDB(c.env);
   const productId = Number(c.req.param("id"));
@@ -484,7 +566,6 @@ productsRouter.post("/:id/images/:imageId/move-up", requireAdmin, async (c) => {
     await db.update(productImages).set({ sortOrder: prev.sortOrder }).where(eq(productImages.imageId, current.imageId));
     await db.update(productImages).set({ sortOrder: current.sortOrder }).where(eq(productImages.imageId, prev.imageId));
 
-    // If the cover image changed, sync products.imageUrl
     if (index - 1 === 0) {
       await db.update(products).set({ imageUrl: current.imageUrl }).where(eq(products.productId, productId));
     }
@@ -494,6 +575,7 @@ productsRouter.post("/:id/images/:imageId/move-up", requireAdmin, async (c) => {
 });
 
 // ── POST /admin/products/:id/images/:imageId/move-down ─
+// (unchanged)
 productsRouter.post("/:id/images/:imageId/move-down", requireAdmin, async (c) => {
   const db = getDB(c.env);
   const productId = Number(c.req.param("id"));
@@ -512,7 +594,6 @@ productsRouter.post("/:id/images/:imageId/move-down", requireAdmin, async (c) =>
     await db.update(productImages).set({ sortOrder: next.sortOrder }).where(eq(productImages.imageId, current.imageId));
     await db.update(productImages).set({ sortOrder: current.sortOrder }).where(eq(productImages.imageId, next.imageId));
 
-    // If current was the cover and got pushed down, sync products.imageUrl to the new first
     if (index === 0) {
       await db.update(products).set({ imageUrl: next.imageUrl }).where(eq(products.productId, productId));
     }
@@ -522,11 +603,11 @@ productsRouter.post("/:id/images/:imageId/move-down", requireAdmin, async (c) =>
 });
 
 // ── POST /admin/products/:id/delete ───────────────────
+// (unchanged)
 productsRouter.post("/:id/delete", requireAdmin, async (c) => {
   const db = getDB(c.env);
   const id = Number(c.req.param("id"));
 
-  // Clean up gallery images from R2 before dropping the DB rows
   const gallery = await db.select().from(productImages).where(eq(productImages.productId, id));
   for (const img of gallery) {
     await deleteFromR2(img.imageUrl, c.env);
@@ -537,6 +618,7 @@ productsRouter.post("/:id/delete", requireAdmin, async (c) => {
 });
 
 // ── POST /admin/products/:id/stock/increase ────────────
+// (unchanged)
 productsRouter.post("/:id/stock/increase", requireAdmin, async (c) => {
   const db = getDB(c.env);
   const id = Number(c.req.param("id"));
@@ -547,6 +629,7 @@ productsRouter.post("/:id/stock/increase", requireAdmin, async (c) => {
 });
 
 // ── POST /admin/products/:id/stock/decrease ────────────
+// (unchanged)
 productsRouter.post("/:id/stock/decrease", requireAdmin, async (c) => {
   const db = getDB(c.env);
   const id = Number(c.req.param("id"));

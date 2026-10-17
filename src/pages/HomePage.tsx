@@ -127,9 +127,9 @@ const MILLING_STEPS = [
 // your real files. No .deco emoji here (unlike the mockup) — that's
 // meant to float over a flat color block, not a photo.
 const HERO_SLIDES = [
-  { src: '/hero-1.webp', kicker: 'Fresh every morning', title: 'Stone-Ground Sharbati Atta', sub: 'Milled in front of you' },
-  { src: '/hero-2.webp', kicker: 'Winter special', title: 'Millet Flours are Back', sub: 'Jowar · Bajra · Ragi — ground to order' },
-  { src: '/hero-3.webp', kicker: 'Full transparency', title: 'Watch Your Grain Get Ground', sub: 'Live counter view · zero mixing guarantee' },
+  { src: '/hero-1.avif', kicker: 'Fresh every morning', title: 'Stone-Ground Sharbati Atta', sub: 'Milled in front of you' },
+  { src: '/hero-2.avif', kicker: 'Winter special', title: 'Millet Flours are Back', sub: 'Jowar · Bajra · Ragi — ground to order' },
+  { src: '/hero-3.avif', kicker: 'Full transparency', title: 'Watch Your Grain Get Ground', sub: 'Live counter view · zero mixing guarantee' },
 ]
 
 

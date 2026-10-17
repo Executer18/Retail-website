@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="mill" viewBox="0 0 30 30" width="30" height="30"><style>
+    @media (prefers-reduced-motion: no-preference) {
+      .mill-spin {
+        animation: spin 4s linear infinite;
+        transform-origin: 15px 15px;
+      }
+    }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+  </style><circle cx="15" cy="15" r="13" fill="#e81e57"></circle><g class="mill-spin" stroke="#fff" stroke-width="2" stroke-linecap="round">
+    <path d="M15 5v20M5 15h20M8 8l14 14M22 8 8 22"></path>
+  </g><circle cx="15" cy="15" r="3.5" fill="#fff"></circle></svg>

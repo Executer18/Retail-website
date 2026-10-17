@@ -20,6 +20,7 @@ export function createAuth(env: Env) {
       enabled: true,
       sendResetPassword: async ({ user, url }) => {
         console.log(`[password reset] for ${user.email}: ${url}`);
+         
         if (env.RESEND_API_KEY) {
           await fetch("https://api.resend.com/emails", {
             method: "POST",
@@ -28,7 +29,7 @@ export function createAuth(env: Env) {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              from: "Atta Chakki <onboarding@resend.dev>",
+              from: env.EMAIL_FROM || 'Atta Chakki <orders@surveyspeck.com>',
               to: [user.email],
               subject: "Reset your password",
               html: `<p>Hi ${user.name},</p>
